@@ -249,12 +249,37 @@
 
         // Connect to your OWN Node.js PeerServer
         const isSecure = window.location.protocol === 'https:';
-        const peer = new Peer(undefined, {
+
+        // Generate a custom short ID for hosts, or use undefined for clients
+        let customPeerId = undefined;
+        if (!roomId && !isJoinMode) {
+            // This is a host - generate a short custom ID
+            customPeerId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        }
+
+        const peer = new Peer(customPeerId, {
             host: window.location.hostname,
             port: window.location.port || (isSecure ? 443 : 80),
             path: '/peerjs',
             secure: isSecure
         });
+
+        // Store peer connections for debugging
+        let hostPeerId = null;
+        const peerConnections = new Map();
+
+        peer.on('error', (err) => {
+            console.error('Peer error:', err);
+            alert('Connection error: ' + err.message);
+        });
+
+        // Check if we have a full peer ID or just a short code
+        let targetPeerId = roomId;
+        if (roomId && roomId.length === 5) {
+            // Short code entered - need to find full ID
+            // For now, we'll search for peers starting with this code
+            console.log('Short code detected:', roomId);
+        }
 
         if (roomId) {
             showView('client-view');
@@ -271,25 +296,41 @@
         }
 
         function submitJoin() {
-            const val = document.getElementById('manual-input').value;
-            if (val) window.location.search = '?room=' + val;
+            const val = document.getElementById('manual-input').value.trim().toUpperCase();
+            if (!val) {
+                alert('Please enter a room code');
+                return;
+            }
+            // Redirect with the room code
+            window.location.search = '?room=' + val;
         }
+
 
         function initHost() {
             peer.on('open', (id) => {
-                document.getElementById('id-display').innerText = id.substring(0, 5).toUpperCase();
+                hostPeerId = id;
+                // ID is already the short code (5 chars)
+                document.getElementById('id-display').innerText = id;
+
+                // Use the short ID in URL
                 const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
-                document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
+                document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code <strong>${id}</strong>`;
                 new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
+                console.log('Host ready with ID:', id);
                 startCam();
             });
 
             peer.on('call', call => {
+                console.log('Incoming call from:', call.peer);
                 call.answer();
                 call.on('stream', stream => {
+                    console.log('Received stream from laptop');
                     document.getElementById('room-pc-setup').style.display = 'none';
                     document.getElementById('media-container').style.display = 'block';
                     document.getElementById('remote-video').srcObject = stream;
+                });
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
                 });
             });
         }
@@ -303,11 +344,40 @@
 
         async function startSharing() {
             try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                console.log('Attempting to share screen to room:', roomId);
+                document.getElementById('status-msg').innerHTML = 'Requesting screen access...';
+
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: true
+                });
+
+                console.log('Screen captured, calling peer:', roomId);
                 const call = peer.call(roomId, stream);
+
+                if (!call) {
+                    throw new Error('Failed to initiate call. Room may not exist.');
+                }
+
                 document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE SHARING</b>';
-                stream.getVideoTracks()[0].onended = () => location.reload();
-            } catch (e) { alert("Error: " + e.message); }
+                document.getElementById('share-btn').disabled = true;
+                document.getElementById('share-btn').innerText = 'Sharing...';
+
+                stream.getVideoTracks()[0].onended = () => {
+                    console.log('Screen sharing ended');
+                    location.reload();
+                };
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    alert('Error during call: ' + err.message);
+                });
+
+            } catch (e) {
+                console.error('Screen share error:', e);
+                document.getElementById('status-msg').innerHTML = '<span style="color:red">Error: ' + e.message + '</span>';
+                alert("Error: " + e.message);
+            }
         }
     </script>
 </body>
