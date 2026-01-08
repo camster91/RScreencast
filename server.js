@@ -5,17 +5,18 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Request logging to see what hits the server
+// Enable trust proxy for Hostinger/Nginx environments
+app.set('trust proxy', true);
+
+// Request logging
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
 
-// Basic route for favicon - PLACED AT TOP
+// Health check and favicon
+app.get('/health', (req, res) => res.send('OK'));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
-
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Create the HTTP server
 const server = app.listen(port, () => {
@@ -24,10 +25,14 @@ const server = app.listen(port, () => {
     console.log(`================================================`);
 });
 
-// Initialize the PeerServer for WebRTC signaling
+// Initialize the PeerServer
 const peerServer = ExpressPeerServer(server, {
     debug: true,
     path: '/'
 });
 
+// Mount signaling server BEFORE static files
 app.use('/peerjs', peerServer);
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
