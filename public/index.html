@@ -504,9 +504,11 @@
 
         async function startSharing() {
             try {
-                showView('room-view');
-                document.getElementById('room-pc-setup').style.display = 'none';
-                document.getElementById('media-container').style.display = 'block';
+                // Hide client view and show room view
+                document.getElementById('client-view').style.display = 'none';
+                document.getElementById('room-view').style.display = 'flex';
+
+                // Initialize as client (not host)
                 await QuickShareConference.init(roomId, false);
             } catch (e) {
                 alert("Connection failed: " + e.message);
