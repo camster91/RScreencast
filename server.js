@@ -14,12 +14,15 @@ app.use((req, res, next) => {
     next();
 });
 
+const http = require('http');
+
 // Health check and favicon
 app.get('/health', (req, res) => res.send('OK'));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Create the HTTP server
-const server = app.listen(port, () => {
+const server = http.createServer(app);
+server.listen(port, () => {
     console.log(`================================================`);
     console.log(`QuickShare Hub is running at http://localhost:${port}`);
     console.log(`================================================`);
@@ -28,7 +31,8 @@ const server = app.listen(port, () => {
 // Initialize the PeerServer
 const peerServer = ExpressPeerServer(server, {
     debug: true,
-    path: '/peerjs'
+    path: '/',
+    proxied: true
 });
 
 // Mount signaling server BEFORE static files
