@@ -38,20 +38,10 @@
         #room-view {
             flex: 1;
             display: flex;
-            position: relative;
-            width: 100%;
-            height: 100vh;
-        }
-
-        /* Main display area for screenshare or welcome screen */
-        #main-display {
-            flex: 1;
-            position: relative;
-            background: var(--bg);
-            display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            width: 100%;
+            position: relative;
         }
 
         .hero-card {
@@ -63,6 +53,7 @@
             max-width: 480px;
             width: 90%;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
         }
 
         #qrcode {
@@ -104,9 +95,35 @@
             border-radius: 8px;
         }
 
-        /* Host webcam preview (removed for simplification) */
-        #room-webcam {
+        #media-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: none;
+            background: black;
+            z-index: 5;
+        }
+
+        #remote-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        #room-webcam {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 280px;
+            aspect-ratio: 16/9;
+            border-radius: 12px;
+            background: #000;
+            border: 2px solid var(--primary);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            object-fit: cover;
         }
 
         #client-view,
@@ -178,131 +195,6 @@
                 transform: rotate(360deg);
             }
         }
-
-        /* Video Window Styles */
-        .video-window {
-            position: absolute;
-            background: var(--card);
-            border-radius: 12px;
-            border: 2px solid var(--primary);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-        }
-
-        .video-window.minimized {
-            height: 48px !important;
-            width: 200px !important;
-        }
-
-        .video-window-header {
-            background: rgba(0, 0, 0, 0.8);
-            padding: 8px 12px;
-            cursor: move;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-            height: 48px;
-        }
-
-        .video-window-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .video-window-controls {
-            display: flex;
-            gap: 4px;
-        }
-
-        .video-window-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            width: 28px;
-            height: 28px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-
-        .video-window-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .video-window-btn.close:hover {
-            background: #ef4444;
-        }
-
-        .video-window video {
-            width: 100%;
-            flex: 1;
-            background: #000;
-            object-fit: cover;
-        }
-
-        .video-window.minimized video {
-            display: none;
-        }
-
-
-        /* Control Bar */
-        #control-bar {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(30, 41, 59, 0.8);
-            backdrop-filter: blur(12px);
-            padding: 12px 24px;
-            border-radius: 100px;
-            display: none;
-            gap: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-        }
-
-        .control-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
-
-        .control-btn.active {
-            background: #ef4444;
-        }
-
-        .control-btn.active:hover {
-            background: #dc2626;
-        }
-
-        .control-btn i {
-            width: 22px;
-            height: 22px;
-        }
     </style>
 </head>
 
@@ -310,24 +202,20 @@
 
     <!-- ROOM PC MODE -->
     <div id="room-view">
-        <!-- Main Display Area -->
-        <div id="main-display">
-            <!-- Welcome Screen (shown when no screenshare) -->
-            <div id="welcome-screen">
-                <div class="hero-card">
-                    <div class="room-badge"><i data-lucide="monitor"></i> SCREEN SHARE HUB</div>
-                    <h1>Ready to View</h1>
-                    <div id="qrcode"></div>
-                    <div class="id-display" id="id-display">...</div>
-                    <div class="url-helper" id="url-helper">Waiting for presenter...</div>
-                    <button class="btn"
-                        style="margin-top:1rem; background:transparent; border:1px solid var(--text-dim); font-size: 0.9rem;"
-                        onclick="location.search='?mode=join'">Manual Join</button>
-                </div>
-            </div>
+        <div id="room-pc-setup" class="hero-card">
+            <div class="room-badge"><i data-lucide="radio"></i> LIVE MEETING ROOM</div>
+            <h1>Ready to Share</h1>
+            <div id="qrcode"></div>
+            <div class="id-display" id="id-display">...</div>
+            <div class="url-helper" id="url-helper">Loading connection...</div>
+            <button class="btn"
+                style="margin-top:1rem; background:transparent; border:1px solid var(--text-dim); font-size: 0.9rem;"
+                onclick="location.search='?mode=join'">Manual Join</button>
+        </div>
 
-            <!-- Main Video (full-screen screenshare) -->
-            <video id="main-video" autoplay playsinline muted></video>
+        <div id="media-container">
+            <video id="remote-video" autoplay playsinline></video>
+            <video id="room-webcam" autoplay playsinline muted></video>
         </div>
     </div>
 
@@ -346,28 +234,12 @@
     <div id="client-view">
         <div class="hero-card">
             <i data-lucide="monitor-up" style="width:64px; height:64px; color:var(--primary); margin-bottom:1rem;"></i>
-            <h2>Ready to Share</h2>
+            <h2>Sharing to Room</h2>
             <p id="target-room-text" style="color:var(--text-dim); margin-bottom:2rem;"></p>
-            <button class="btn" id="share-btn" onclick="startSharing()">Connect to Room</button>
+            <button class="btn" id="share-btn" onclick="startSharing()">Start Screen Share</button>
             <div id="status-msg" style="margin-top:2rem; color:var(--text-dim);"></div>
         </div>
     </div>
-
-
-    <!-- Control Bar -->
-
-    <div id="control-bar">
-        <button class="control-btn" id="screen-btn" onclick="QuickShareConference.toggleScreenShare()"
-            title="Toggle Screen Share">
-            <i data-lucide="monitor"></i>
-        </button>
-        <button class="control-btn" style="background: #ef4444;" onclick="QuickShareConference.leaveRoom()"
-            title="Leave Room">
-            <i data-lucide="phone-off"></i>
-        </button>
-    </div>
-
-    <script src="conference.js"></script>
 
     <script>
         lucide.createIcons();
@@ -375,41 +247,126 @@
         const roomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
 
+        // Connect to your OWN Node.js PeerServer
+        const isSecure = window.location.protocol === 'https:';
+
+        // Peer configuration for production/HTTPS deployment
+        const peerConfig = {
+            host: window.location.hostname,
+            path: '/peerjs',
+            secure: isSecure,
+            debug: 2 // Enable debug logging
+        };
+
+        // Only set port if explicitly specified (for local dev)
+        // Production with reverse proxy should not specify port
+        if (window.location.port) {
+            peerConfig.port = parseInt(window.location.port);
+        }
+
+        console.log('PeerJS Config:', peerConfig);
+        const peer = new Peer(undefined, peerConfig);
+
+        // Add error handling
+        peer.on('error', (err) => {
+            console.error('Peer error:', err.type, err);
+            const urlHelper = document.getElementById('url-helper');
+            if (urlHelper) {
+                urlHelper.innerHTML = `<span style="color: #ef4444;">Connection Error: ${err.type}</span>`;
+            }
+        });
+
+        peer.on('disconnected', () => {
+            console.warn('Peer disconnected, attempting to reconnect...');
+            peer.reconnect();
+        });
+
         if (roomId) {
             showView('client-view');
-            document.getElementById('target-room-text').innerText = "Room ID: " + roomId.toUpperCase();
+            document.getElementById('target-room-text').innerText = "Room ID: " + roomId.substring(0, 5).toUpperCase();
         } else if (isJoinMode) {
             showView('manual-join-view');
         } else {
-            showView('room-view');
-            QuickShareConference.init(null, true);
+            initHost();
         }
 
         function showView(id) {
-            ['room-view', 'client-view', 'manual-join-view'].forEach(v => {
-                const el = document.getElementById(v);
-                if (el) el.style.display = 'none';
-            });
-            const target = document.getElementById(id);
-            if (target) target.style.display = 'flex';
+            ['room-view', 'client-view', 'manual-join-view'].forEach(v => document.getElementById(v).style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
         }
 
         function submitJoin() {
-            const val = document.getElementById('manual-input').value.trim();
-            if (val) window.location.search = '?room=' + val.toUpperCase();
+            const val = document.getElementById('manual-input').value;
+            if (val) window.location.search = '?room=' + val;
+        }
+
+        function initHost() {
+            peer.on('open', (id) => {
+                console.log('Peer opened with ID:', id);
+                document.getElementById('id-display').innerText = id.substring(0, 5).toUpperCase();
+                const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
+                document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
+                new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
+                startCam();
+            });
+
+            peer.on('call', call => {
+                console.log('Incoming call from:', call.peer);
+                call.answer();
+
+                call.on('stream', stream => {
+                    console.log('Received remote stream with tracks:', stream.getTracks().length);
+                    document.getElementById('room-pc-setup').style.display = 'none';
+                    document.getElementById('media-container').style.display = 'block';
+                    document.getElementById('remote-video').srcObject = stream;
+                });
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                });
+
+                call.on('close', () => {
+                    console.log('Call closed');
+                    document.getElementById('room-pc-setup').style.display = 'flex';
+                    document.getElementById('media-container').style.display = 'none';
+                });
+            });
+        }
+
+        async function startCam() {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('room-webcam').srcObject = s;
+            } catch (e) { }
         }
 
         async function startSharing() {
             try {
-                // Hide client view and show room view
-                document.getElementById('client-view').style.display = 'none';
-                document.getElementById('room-view').style.display = 'flex';
+                console.log('Requesting screen share...');
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                console.log('Got screen share stream, calling room:', roomId);
 
-                // Initialize as client (not host)
-                await QuickShareConference.init(roomId, false);
+                const call = peer.call(roomId, stream);
+
+                if (!call) {
+                    throw new Error('Failed to create call. Check if peer ID is valid.');
+                }
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    alert('Call error: ' + err.message);
+                });
+
+                console.log('Call initiated successfully');
+                document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE SHARING</b>';
+
+                stream.getVideoTracks()[0].onended = () => {
+                    console.log('Screen share ended');
+                    location.reload();
+                };
             } catch (e) {
-                alert("Connection failed: " + e.message);
-                location.reload();
+                console.error('Screen share error:', e);
+                alert("Error: " + e.message);
             }
         }
     </script>
