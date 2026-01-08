@@ -12,20 +12,15 @@ const QuickShareConference = {
     peers: new Map(), // peerId -> {call, stream, type}
 
     // Media state
-    isMicEnabled: true,
-    isCameraEnabled: true,
     isScreenSharing: false,
 
     // Main display state (for host)
     activeScreenSharePeerId: null,
     mainDisplayStream: null,
 
-    // Helper to get current active stream (screen if sharing, else camera)
+    // Helper to get current active stream (screen if sharing)
     getActiveStream() {
-        if (this.isScreenSharing && this.screenStream) {
-            return this.screenStream;
-        }
-        return this.localStream || new MediaStream();
+        return this.screenStream || new MediaStream();
     },
 
     // Detect if a stream is a screen share
@@ -99,15 +94,6 @@ const QuickShareConference = {
         this.roomId = roomId;
         this.isHost = isHost;
 
-        // Setup peer connection
-        await this.setupPeer();
-
-        // Get local media
-        await this.getLocalMedia();
-
-        // Setup UI
-        this.setupUI();
-
         if (isHost) {
             this.initAsHost();
         } else {
@@ -154,26 +140,27 @@ const QuickShareConference = {
         });
     },
 
-    // Get local camera and microphone
-    async getLocalMedia() {
+    // Get local stream (screen share)
+    async getScreenStream() {
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
+            this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
                 audio: true
             });
-            console.log('Got local media stream with tracks:', this.localStream.getTracks().map(t => `${t.kind}:${t.label}`));
+            this.isScreenSharing = true;
+            console.log('Got screen media stream');
             return true;
         } catch (err) {
-            console.warn('Error getting local media:', err.name, err.message);
-            // Create a silent/black stream as fallback
-            console.log('Creating empty fallback stream');
-            this.localStream = new MediaStream();
+            console.warn('Error getting screen media:', err);
             return false;
         }
     },
 
     // Initialize as host
-    initAsHost() {
+    async initAsHost() {
+        await this.setupPeer();
+        this.setupUI();
+
         // Display room code
         const idDisplay = document.getElementById('id-display');
         if (idDisplay) idDisplay.innerText = this.myPeerId;
@@ -186,25 +173,16 @@ const QuickShareConference = {
 
         const qrContainer = document.getElementById("qrcode");
         if (qrContainer) {
-            qrContainer.innerHTML = ''; // Clear previous QR
+            qrContainer.innerHTML = '';
             new QRCode(qrContainer, { text: joinUrl, width: 180, height: 180 });
         }
-
-        // Show local webcam preview
-        const roomWebcam = document.getElementById('room-webcam');
-        if (roomWebcam && this.localStream) {
-            roomWebcam.srcObject = this.localStream;
-        }
-
-        // Show control bar
-        const controlBar = document.getElementById('control-bar');
-        if (controlBar) controlBar.style.display = 'flex';
-
-        lucide.createIcons();
     },
 
     // Initialize as client
     async initAsClient() {
+        await this.setupPeer();
+        this.setupUI();
+
         // Auto-join the room
         await this.joinRoom(this.roomId);
 
@@ -290,32 +268,22 @@ const QuickShareConference = {
             const peerData = this.peers.get(peerId);
             peerData.stream = stream;
 
-            // Check if this is a stream change (e.g., screen share toggle)
             if (this.isHost) {
-                if (this.isScreenShareStream(stream)) {
-                    console.log('Peer started screen sharing:', peerId);
-                    this.showInMainDisplay(peerId, stream);
-                } else if (this.activeScreenSharePeerId === peerId) {
-                    console.log('Peer stopped screen sharing:', peerId);
-                    this.clearMainDisplay();
-                }
+                console.log('Peer stream updated:', peerId);
+                this.showInMainDisplay(peerId, stream);
             }
             return;
         }
 
         this.peers.set(peerId, { call, stream, type });
 
-        // Route to appropriate display
+        // Route to main display for host
         if (this.isHost) {
-            // Check if this is a screen share
-            if (this.isScreenShareStream(stream)) {
-                console.log('New peer with screen share:', peerId);
-                this.showInMainDisplay(peerId, stream);
-            }
-            // Always add to sidebar (even if screen sharing)
-            this.addToParticipantsGrid(peerId, stream);
-        } else {
-            this.renderPeer(peerId, stream, type);
+            console.log('New peer connected:', peerId);
+            this.showInMainDisplay(peerId, stream);
+        } else if (type === 'host') {
+            // Client view: show host's stream in a simplified way or ignore if host doesn't share
+            console.log('Connected to host');
         }
     },
 
@@ -325,182 +293,19 @@ const QuickShareConference = {
         if (peerObj) {
             if (peerObj.call) peerObj.call.close();
             this.peers.delete(peerId);
-            this.removePeerUI(peerId);
 
-            // If this peer was screen sharing on main display, clear it
+            // If this peer was on main display, clear it
             if (this.isHost && this.activeScreenSharePeerId === peerId) {
-                console.log('Screen sharing peer disconnected, clearing main display');
                 this.clearMainDisplay();
             }
         }
     },
 
-    // Render peer video based on role
-    renderPeer(peerId, stream, type) {
-        if (this.isHost) {
-            // Host view: add to participants grid
-            this.addToParticipantsGrid(peerId, stream);
-        } else {
-            // Client view: create floating window if it's the host's stream
-            if (type === 'host') {
-                this.createFloatingWindow(peerId, stream, 'Meeting Room');
-            } else {
-                // Other participants in grid
-                this.addToParticipantsGrid(peerId, stream);
-            }
-        }
-    },
-
-    // UI: Add to participants grid
-    addToParticipantsGrid(peerId, stream) {
-        const grid = document.getElementById('participants-grid');
-        if (!grid) return;
-
-        let tile = document.getElementById(`peer-${peerId}`);
-        if (!tile) {
-            tile = document.createElement('div');
-            tile.className = 'participant-tile';
-            tile.id = `peer-${peerId}`;
-            grid.appendChild(tile);
-        }
-
-        tile.innerHTML = `
-            <video autoplay playsinline muted></video>
-            <div class="participant-name">${peerId.substring(0, 5)}</div>
-        `;
-
-        const video = tile.querySelector('video');
-        console.log(`Setting stream for participant ${peerId}, tracks:`, stream.getTracks().map(t => t.kind));
-
-        // Check if stream has tracks
-        if (stream.getTracks().length === 0) {
-            console.warn(`Stream for ${peerId} has no tracks!`);
-            tile.innerHTML += '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;background:rgba(0,0,0,0.7);padding:10px;border-radius:8px;">No media</div>';
-        }
-
-        video.srcObject = stream;
-        video.muted = true; // Ensure muted for autoplay
-        video.onloadedmetadata = () => {
-            console.log(`Video metadata loaded for ${peerId}`);
-            video.play().then(() => {
-                console.log(`Video playing for ${peerId}`);
-            }).catch(e => console.error('Autoplay failed:', e));
-        };
-    },
-
-    // UI: Create floating video window
-    createFloatingWindow(peerId, stream, title) {
-        const container = document.getElementById('video-windows-container');
-        if (!container) return;
-
-        let windowDiv = document.getElementById(`window-${peerId}`);
-        if (!windowDiv) {
-            windowDiv = document.createElement('div');
-            windowDiv.className = 'video-window';
-            windowDiv.id = `window-${peerId}`;
-            windowDiv.style.left = '20px';
-            windowDiv.style.top = '20px';
-            windowDiv.style.width = '400px';
-            windowDiv.style.height = '300px';
-            container.appendChild(windowDiv);
-        }
-
-        windowDiv.innerHTML = `
-            <div class="video-window-header">
-                <div class="video-window-title">${title}</div>
-                <div class="video-window-controls">
-                    <button class="video-window-btn" id="minimize-${peerId}"><i data-lucide="minus"></i></button>
-                    <button class="video-window-btn close" id="close-${peerId}"><i data-lucide="x"></i></button>
-                </div>
-            </div>
-            <video autoplay playsinline muted></video>
-        `;
-
-        const video = windowDiv.querySelector('video');
-        console.log(`Setting stream for floating window ${peerId}, tracks:`, stream.getTracks().map(t => t.kind));
-        video.srcObject = stream;
-        video.muted = true; // Ensure muted for autoplay
-        video.onloadedmetadata = () => {
-            console.log(`Floating window video metadata loaded for ${peerId}`);
-            video.play().then(() => {
-                console.log(`Floating window video playing for ${peerId}`);
-            }).catch(e => console.error('Autoplay failed for floating window:', e));
-        };
-
-        lucide.createIcons();
-
-        // Controls
-        windowDiv.querySelector(`#minimize-${peerId}`).onclick = () => windowDiv.classList.toggle('minimized');
-        windowDiv.querySelector(`#close-${peerId}`).onclick = () => windowDiv.remove();
-
-        this.makeDraggable(windowDiv);
-    },
-
-    // UI: Make window draggable
-    makeDraggable(element) {
-        const header = element.querySelector('.video-window-header');
-        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-
-        header.onmousedown = (e) => {
-            e.preventDefault();
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            document.onmouseup = () => {
-                document.onmouseup = null;
-                document.onmousemove = null;
-            };
-            document.onmousemove = (e) => {
-                e.preventDefault();
-                pos1 = pos3 - e.clientX;
-                pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                element.style.top = (element.offsetTop - pos2) + "px";
-                element.style.left = (element.offsetLeft - pos1) + "px";
-            };
-        };
-    },
-
     // UI: Remove peer elements
     removePeerUI(peerId) {
-        const tile = document.getElementById(`peer-${peerId}`);
-        if (tile) tile.remove();
-
-        const windowDiv = document.getElementById(`window-${peerId}`);
-        if (windowDiv) windowDiv.remove();
+        // No-op in simplified version as we don't have separate tiles
     },
 
-    // Media: Toggle Mic
-    toggleMic() {
-        if (!this.localStream) return;
-        const audioTrack = this.localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            audioTrack.enabled = !audioTrack.enabled;
-            this.isMicEnabled = audioTrack.enabled;
-            const btn = document.getElementById('mic-btn');
-            if (btn) {
-                btn.classList.toggle('active', !this.isMicEnabled);
-                btn.querySelector('i').setAttribute('data-lucide', this.isMicEnabled ? 'mic' : 'mic-off');
-                lucide.createIcons();
-            }
-        }
-    },
-
-    // Media: Toggle Camera
-    toggleCamera() {
-        if (!this.localStream) return;
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            this.isCameraEnabled = videoTrack.enabled;
-            const btn = document.getElementById('camera-btn');
-            if (btn) {
-                btn.classList.toggle('active', !this.isCameraEnabled);
-                btn.querySelector('i').setAttribute('data-lucide', this.isCameraEnabled ? 'video' : 'video-off');
-                lucide.createIcons();
-            }
-        }
-    },
 
     // Media: Toggle Screen Share
     async toggleScreenShare() {

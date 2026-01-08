@@ -51,52 +51,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-
-        /* Welcome screen (shown when no screenshare) */
-        #welcome-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #welcome-screen.hidden {
-            display: none;
-        }
-
-        /* Main video for full-screen screenshare */
-        #main-video {
-            display: none;
             width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background: #000;
-        }
-
-        #main-video.active {
-            display: block;
-        }
-
-        /* Participants sidebar */
-        #participants-sidebar {
-            width: 400px;
-            height: 100vh;
-            background: rgba(15, 23, 42, 0.95);
-            border-left: 1px solid rgba(255, 255, 255, 0.1);
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        #participants-sidebar h3 {
-            color: var(--text);
-            font-size: 1.1rem;
-            margin: 0 0 10px 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .hero-card {
@@ -149,19 +104,9 @@
             border-radius: 8px;
         }
 
-        /* Host webcam preview (bottom-left corner) */
+        /* Host webcam preview (removed for simplification) */
         #room-webcam {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            width: 280px;
-            aspect-ratio: 16/9;
-            border-radius: 12px;
-            background: #000;
-            border: 2px solid var(--primary);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-            z-index: 100;
-            object-fit: cover;
+            display: none;
         }
 
         #client-view,
@@ -309,39 +254,6 @@
             display: none;
         }
 
-        /* Participants Grid (in sidebar) */
-        #participants-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .participant-tile {
-            background: var(--card);
-            border-radius: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-            aspect-ratio: 16/9;
-            position: relative;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        .participant-tile video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .participant-name {
-            position: absolute;
-            bottom: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            backdrop-filter: blur(4px);
-        }
 
         /* Control Bar */
         #control-bar {
@@ -403,11 +315,11 @@
             <!-- Welcome Screen (shown when no screenshare) -->
             <div id="welcome-screen">
                 <div class="hero-card">
-                    <div class="room-badge"><i data-lucide="radio"></i> LIVE MEETING ROOM</div>
-                    <h1>Ready to Share</h1>
+                    <div class="room-badge"><i data-lucide="monitor"></i> SCREEN SHARE HUB</div>
+                    <h1>Ready to View</h1>
                     <div id="qrcode"></div>
                     <div class="id-display" id="id-display">...</div>
-                    <div class="url-helper" id="url-helper">Loading connection...</div>
+                    <div class="url-helper" id="url-helper">Waiting for presenter...</div>
                     <button class="btn"
                         style="margin-top:1rem; background:transparent; border:1px solid var(--text-dim); font-size: 0.9rem;"
                         onclick="location.search='?mode=join'">Manual Join</button>
@@ -416,15 +328,6 @@
 
             <!-- Main Video (full-screen screenshare) -->
             <video id="main-video" autoplay playsinline muted></video>
-
-            <!-- Host's webcam preview (always visible in corner) -->
-            <video id="room-webcam" autoplay playsinline muted></video>
-        </div>
-
-        <!-- Participants Sidebar -->
-        <div id="participants-sidebar">
-            <h3>Participants</h3>
-            <div id="participants-grid"></div>
         </div>
     </div>
 
@@ -454,12 +357,6 @@
     <!-- Control Bar -->
 
     <div id="control-bar">
-        <button class="control-btn" id="mic-btn" onclick="QuickShareConference.toggleMic()" title="Toggle Microphone">
-            <i data-lucide="mic"></i>
-        </button>
-        <button class="control-btn" id="camera-btn" onclick="QuickShareConference.toggleCamera()" title="Toggle Camera">
-            <i data-lucide="video"></i>
-        </button>
         <button class="control-btn" id="screen-btn" onclick="QuickShareConference.toggleScreenShare()"
             title="Toggle Screen Share">
             <i data-lucide="monitor"></i>
