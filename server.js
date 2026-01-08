@@ -8,6 +8,9 @@ const port = process.env.PORT || 3000;
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Basic route for favicon to prevent 404s
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Create the HTTP server
 const server = app.listen(port, () => {
     console.log(`================================================`);
@@ -18,7 +21,7 @@ const server = app.listen(port, () => {
 // Initialize the PeerServer for WebRTC signaling
 const peerServer = ExpressPeerServer(server, {
     debug: true,
-    path: '/signal'
+    path: '/'
 });
 
 app.use('/peerjs', peerServer);
