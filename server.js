@@ -5,11 +5,17 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Request logging to see what hits the server
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
+
+// Basic route for favicon - PLACED AT TOP
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Basic route for favicon to prevent 404s
-app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Create the HTTP server
 const server = app.listen(port, () => {
