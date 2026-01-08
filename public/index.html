@@ -249,11 +249,36 @@
 
         // Connect to your OWN Node.js PeerServer
         const isSecure = window.location.protocol === 'https:';
-        const peer = new Peer(undefined, {
+
+        // Peer configuration for production/HTTPS deployment
+        const peerConfig = {
             host: window.location.hostname,
-            port: window.location.port || (isSecure ? 443 : 80),
             path: '/peerjs',
-            secure: isSecure
+            secure: isSecure,
+            debug: 2 // Enable debug logging
+        };
+
+        // Only set port if explicitly specified (for local dev)
+        // Production with reverse proxy should not specify port
+        if (window.location.port) {
+            peerConfig.port = parseInt(window.location.port);
+        }
+
+        console.log('PeerJS Config:', peerConfig);
+        const peer = new Peer(undefined, peerConfig);
+
+        // Add error handling
+        peer.on('error', (err) => {
+            console.error('Peer error:', err.type, err);
+            const urlHelper = document.getElementById('url-helper');
+            if (urlHelper) {
+                urlHelper.innerHTML = `<span style="color: #ef4444;">Connection Error: ${err.type}</span>`;
+            }
+        });
+
+        peer.on('disconnected', () => {
+            console.warn('Peer disconnected, attempting to reconnect...');
+            peer.reconnect();
         });
 
         if (roomId) {
@@ -277,6 +302,7 @@
 
         function initHost() {
             peer.on('open', (id) => {
+                console.log('Peer opened with ID:', id);
                 document.getElementById('id-display').innerText = id.substring(0, 5).toUpperCase();
                 const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
                 document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
@@ -285,11 +311,24 @@
             });
 
             peer.on('call', call => {
+                console.log('Incoming call from:', call.peer);
                 call.answer();
+
                 call.on('stream', stream => {
+                    console.log('Received remote stream with tracks:', stream.getTracks().length);
                     document.getElementById('room-pc-setup').style.display = 'none';
                     document.getElementById('media-container').style.display = 'block';
                     document.getElementById('remote-video').srcObject = stream;
+                });
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                });
+
+                call.on('close', () => {
+                    console.log('Call closed');
+                    document.getElementById('room-pc-setup').style.display = 'flex';
+                    document.getElementById('media-container').style.display = 'none';
                 });
             });
         }
@@ -303,11 +342,32 @@
 
         async function startSharing() {
             try {
+                console.log('Requesting screen share...');
                 const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                console.log('Got screen share stream, calling room:', roomId);
+
                 const call = peer.call(roomId, stream);
+
+                if (!call) {
+                    throw new Error('Failed to create call. Check if peer ID is valid.');
+                }
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    alert('Call error: ' + err.message);
+                });
+
+                console.log('Call initiated successfully');
                 document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE SHARING</b>';
-                stream.getVideoTracks()[0].onended = () => location.reload();
-            } catch (e) { alert("Error: " + e.message); }
+
+                stream.getVideoTracks()[0].onended = () => {
+                    console.log('Screen share ended');
+                    location.reload();
+                };
+            } catch (e) {
+                console.error('Screen share error:', e);
+                alert("Error: " + e.message);
+            }
         }
     </script>
 </body>

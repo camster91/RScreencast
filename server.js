@@ -31,7 +31,7 @@ server.listen(port, () => {
 // Initialize the PeerServer
 const peerServer = ExpressPeerServer(server, {
     debug: true,
-    path: '/peerjs',
+    path: '/',
     proxied: true
 });
 
