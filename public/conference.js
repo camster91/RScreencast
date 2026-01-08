@@ -16,6 +16,84 @@ const QuickShareConference = {
     isCameraEnabled: true,
     isScreenSharing: false,
 
+    // Main display state (for host)
+    activeScreenSharePeerId: null,
+    mainDisplayStream: null,
+
+    // Helper to get current active stream (screen if sharing, else camera)
+    getActiveStream() {
+        if (this.isScreenSharing && this.screenStream) {
+            return this.screenStream;
+        }
+        return this.localStream || new MediaStream();
+    },
+
+    // Detect if a stream is a screen share
+    isScreenShareStream(stream) {
+        if (!stream) return false;
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) return false;
+
+        // Check track label and settings for screen share indicators
+        const label = videoTrack.label.toLowerCase();
+        const settings = videoTrack.getSettings();
+
+        console.log('Checking if screen share:', {
+            label,
+            displaySurface: settings.displaySurface,
+            isScreen: label.includes('screen') || settings.displaySurface === 'monitor' || settings.displaySurface === 'window'
+        });
+
+        return label.includes('screen') ||
+            label.includes('display') ||
+            settings.displaySurface === 'monitor' ||
+            settings.displaySurface === 'window' ||
+            settings.displaySurface === 'browser';
+    },
+
+    // Show stream in main display area (host only)
+    showInMainDisplay(peerId, stream) {
+        if (!this.isHost) return;
+
+        console.log('Showing stream in main display for peer:', peerId);
+        this.activeScreenSharePeerId = peerId;
+        this.mainDisplayStream = stream;
+
+        const mainVideo = document.getElementById('main-video');
+        const welcomeScreen = document.getElementById('welcome-screen');
+
+        if (mainVideo && welcomeScreen) {
+            mainVideo.srcObject = stream;
+            mainVideo.classList.add('active');
+            welcomeScreen.classList.add('hidden');
+
+            mainVideo.onloadedmetadata = () => {
+                mainVideo.play().then(() => {
+                    console.log('Main display video playing');
+                }).catch(e => console.error('Main display autoplay failed:', e));
+            };
+        }
+    },
+
+    // Clear main display and return to welcome screen (host only)
+    clearMainDisplay() {
+        if (!this.isHost) return;
+
+        console.log('Clearing main display');
+        this.activeScreenSharePeerId = null;
+        this.mainDisplayStream = null;
+
+        const mainVideo = document.getElementById('main-video');
+        const welcomeScreen = document.getElementById('welcome-screen');
+
+        if (mainVideo && welcomeScreen) {
+            mainVideo.srcObject = null;
+            mainVideo.classList.remove('active');
+            welcomeScreen.classList.remove('hidden');
+        }
+    },
+
+
     // Initialize the conference
     async init(roomId, isHost) {
         this.roomId = roomId;
@@ -53,7 +131,8 @@ const QuickShareConference = {
             host: window.location.hostname,
             port: window.location.port || (isSecure ? 443 : 80),
             path: '/peerjs',
-            secure: isSecure
+            secure: isSecure,
+            debug: 3
         });
 
         return new Promise((resolve, reject) => {
@@ -82,10 +161,14 @@ const QuickShareConference = {
                 video: true,
                 audio: true
             });
-            console.log('Got local media stream');
+            console.log('Got local media stream with tracks:', this.localStream.getTracks().map(t => `${t.kind}:${t.label}`));
+            return true;
         } catch (err) {
-            console.warn('Error getting local media:', err);
-            // Continue without camera/mic if blocked
+            console.warn('Error getting local media:', err.name, err.message);
+            // Create a silent/black stream as fallback
+            console.log('Creating empty fallback stream');
+            this.localStream = new MediaStream();
+            return false;
         }
     },
 
@@ -136,12 +219,18 @@ const QuickShareConference = {
     async joinRoom(hostPeerId) {
         console.log('Joining room:', hostPeerId);
 
-        // Call the host with our local stream (if available)
-        const call = this.peer.call(hostPeerId, this.localStream || new MediaStream());
+        // Call the host with our active stream
+        const activeStream = this.getActiveStream();
+        console.log('Starting call with stream tracks:', activeStream.getTracks().map(t => t.kind));
+
+        const call = this.peer.call(hostPeerId, activeStream);
 
         call.on('stream', (remoteStream) => {
-            console.log('Received stream from host');
+            console.log('Received stream from host, tracks:', remoteStream.getTracks().map(t => t.kind));
             this.addPeer(hostPeerId, call, remoteStream, 'host');
+
+            // Listen for track changes (screen share toggle)
+            this.setupTrackListeners(hostPeerId, remoteStream);
         });
 
         call.on('error', (err) => {
@@ -153,12 +242,18 @@ const QuickShareConference = {
     handleIncomingCall(call) {
         console.log('Incoming call from:', call.peer);
 
-        // Answer with our local stream
-        call.answer(this.localStream || new MediaStream());
+        // Answer with our current active stream
+        const activeStream = this.getActiveStream();
+        console.log('Answering call with stream tracks:', activeStream.getTracks().map(t => t.kind));
+
+        call.answer(activeStream);
 
         call.on('stream', (remoteStream) => {
-            console.log('Received stream from:', call.peer);
+            console.log('Received stream from:', call.peer, 'tracks:', remoteStream.getTracks().map(t => t.kind));
             this.addPeer(call.peer, call, remoteStream, 'participant');
+
+            // Listen for track changes (screen share toggle)
+            this.setupTrackListeners(call.peer, remoteStream);
         });
 
         call.on('close', () => {
@@ -167,12 +262,61 @@ const QuickShareConference = {
         });
     },
 
+    // Setup listeners for track changes (screen share toggle)
+    setupTrackListeners(peerId, stream) {
+        stream.addEventListener('addtrack', (event) => {
+            console.log('Track added to stream:', peerId, event.track.kind, event.track.label);
+            // Re-evaluate the stream to check if it's now a screen share
+            const peerData = this.peers.get(peerId);
+            if (peerData) {
+                this.addPeer(peerId, peerData.call, stream, peerData.type);
+            }
+        });
+
+        stream.addEventListener('removetrack', (event) => {
+            console.log('Track removed from stream:', peerId, event.track.kind);
+            // Re-evaluate the stream
+            const peerData = this.peers.get(peerId);
+            if (peerData) {
+                this.addPeer(peerId, peerData.call, stream, peerData.type);
+            }
+        });
+    },
+
     // Add a peer to state and UI
     addPeer(peerId, call, stream, type) {
-        if (this.peers.has(peerId)) return;
+        if (this.peers.has(peerId)) {
+            // Update existing peer's stream
+            const peerData = this.peers.get(peerId);
+            peerData.stream = stream;
+
+            // Check if this is a stream change (e.g., screen share toggle)
+            if (this.isHost) {
+                if (this.isScreenShareStream(stream)) {
+                    console.log('Peer started screen sharing:', peerId);
+                    this.showInMainDisplay(peerId, stream);
+                } else if (this.activeScreenSharePeerId === peerId) {
+                    console.log('Peer stopped screen sharing:', peerId);
+                    this.clearMainDisplay();
+                }
+            }
+            return;
+        }
 
         this.peers.set(peerId, { call, stream, type });
-        this.renderPeer(peerId, stream, type);
+
+        // Route to appropriate display
+        if (this.isHost) {
+            // Check if this is a screen share
+            if (this.isScreenShareStream(stream)) {
+                console.log('New peer with screen share:', peerId);
+                this.showInMainDisplay(peerId, stream);
+            }
+            // Always add to sidebar (even if screen sharing)
+            this.addToParticipantsGrid(peerId, stream);
+        } else {
+            this.renderPeer(peerId, stream, type);
+        }
     },
 
     // Remove a peer
@@ -182,6 +326,12 @@ const QuickShareConference = {
             if (peerObj.call) peerObj.call.close();
             this.peers.delete(peerId);
             this.removePeerUI(peerId);
+
+            // If this peer was screen sharing on main display, clear it
+            if (this.isHost && this.activeScreenSharePeerId === peerId) {
+                console.log('Screen sharing peer disconnected, clearing main display');
+                this.clearMainDisplay();
+            }
         }
     },
 
@@ -215,12 +365,27 @@ const QuickShareConference = {
         }
 
         tile.innerHTML = `
-            <video autoplay playsinline></video>
+            <video autoplay playsinline muted></video>
             <div class="participant-name">${peerId.substring(0, 5)}</div>
         `;
 
         const video = tile.querySelector('video');
+        console.log(`Setting stream for participant ${peerId}, tracks:`, stream.getTracks().map(t => t.kind));
+
+        // Check if stream has tracks
+        if (stream.getTracks().length === 0) {
+            console.warn(`Stream for ${peerId} has no tracks!`);
+            tile.innerHTML += '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;background:rgba(0,0,0,0.7);padding:10px;border-radius:8px;">No media</div>';
+        }
+
         video.srcObject = stream;
+        video.muted = true; // Ensure muted for autoplay
+        video.onloadedmetadata = () => {
+            console.log(`Video metadata loaded for ${peerId}`);
+            video.play().then(() => {
+                console.log(`Video playing for ${peerId}`);
+            }).catch(e => console.error('Autoplay failed:', e));
+        };
     },
 
     // UI: Create floating video window
@@ -248,11 +413,19 @@ const QuickShareConference = {
                     <button class="video-window-btn close" id="close-${peerId}"><i data-lucide="x"></i></button>
                 </div>
             </div>
-            <video autoplay playsinline></video>
+            <video autoplay playsinline muted></video>
         `;
 
         const video = windowDiv.querySelector('video');
+        console.log(`Setting stream for floating window ${peerId}, tracks:`, stream.getTracks().map(t => t.kind));
         video.srcObject = stream;
+        video.muted = true; // Ensure muted for autoplay
+        video.onloadedmetadata = () => {
+            console.log(`Floating window video metadata loaded for ${peerId}`);
+            video.play().then(() => {
+                console.log(`Floating window video playing for ${peerId}`);
+            }).catch(e => console.error('Autoplay failed for floating window:', e));
+        };
 
         lucide.createIcons();
 
@@ -333,22 +506,52 @@ const QuickShareConference = {
     async toggleScreenShare() {
         if (!this.isScreenSharing) {
             try {
-                this.screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                console.log('Starting screen share...');
+                this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: true
+                });
                 this.isScreenSharing = true;
+                console.log('Screen share started with tracks:', this.screenStream.getTracks().map(t => t.kind));
 
                 const btn = document.getElementById('screen-btn');
                 if (btn) btn.classList.add('active');
 
                 // Replace video track in all active calls
                 const videoTrack = this.screenStream.getVideoTracks()[0];
-                this.peers.forEach(p => {
-                    const sender = p.call.peerConnection.getSenders().find(s => s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(videoTrack);
+                if (!videoTrack) {
+                    console.error('No video track in screen stream!');
+                    this.stopScreenShare();
+                    return;
+                }
+
+                console.log(`Replacing tracks for ${this.peers.size} peers`);
+                this.peers.forEach((p, peerId) => {
+                    if (p.call && p.call.peerConnection) {
+                        const senders = p.call.peerConnection.getSenders();
+                        const sender = senders.find(s => s.track && s.track.kind === 'video');
+                        if (sender && sender.track) {
+                            console.log('Replacing video track for peer:', peerId);
+                            sender.replaceTrack(videoTrack).then(() => {
+                                console.log('Track replaced successfully for', peerId);
+                            }).catch(err => {
+                                console.error('Failed to replace track for', peerId, err);
+                            });
+                        } else {
+                            console.warn('No video sender found for peer:', peerId);
+                        }
+                    } else {
+                        console.warn('Peer connection not available for', peerId);
+                    }
                 });
 
-                videoTrack.onended = () => this.stopScreenShare();
+                videoTrack.onended = () => {
+                    console.log('Screen share ended by user');
+                    this.stopScreenShare();
+                };
             } catch (err) {
                 console.error('Screen share failed:', err);
+                alert('Screen sharing failed: ' + err.message);
             }
         } else {
             this.stopScreenShare();
@@ -356,8 +559,12 @@ const QuickShareConference = {
     },
 
     stopScreenShare() {
+        console.log('Stopping screen share...');
         if (this.screenStream) {
-            this.screenStream.getTracks().forEach(t => t.stop());
+            this.screenStream.getTracks().forEach(t => {
+                console.log('Stopping track:', t.kind);
+                t.stop();
+            });
             this.screenStream = null;
         }
         this.isScreenSharing = false;
@@ -367,10 +574,23 @@ const QuickShareConference = {
         // Restore camera track
         if (this.localStream) {
             const videoTrack = this.localStream.getVideoTracks()[0];
-            this.peers.forEach(p => {
-                const sender = p.call.peerConnection.getSenders().find(s => s.track.kind === 'video');
-                if (sender) sender.replaceTrack(videoTrack);
-            });
+            if (videoTrack) {
+                console.log('Restoring camera track to peers');
+                this.peers.forEach((p, peerId) => {
+                    if (p.call && p.call.peerConnection) {
+                        const sender = p.call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                        if (sender) {
+                            sender.replaceTrack(videoTrack).then(() => {
+                                console.log('Camera track restored for', peerId);
+                            }).catch(err => {
+                                console.error('Failed to restore camera for', peerId, err);
+                            });
+                        }
+                    }
+                });
+            } else {
+                console.warn('No camera track available to restore');
+            }
         }
     },
 
