@@ -195,163 +195,6 @@
                 transform: rotate(360deg);
             }
         }
-
-        /* Video Window Styles */
-        .video-window {
-            position: absolute;
-            background: var(--card);
-            border-radius: 12px;
-            border: 2px solid var(--primary);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-            resize: both;
-            min-width: 200px;
-            min-height: 150px;
-            z-index: 1000;
-        }
-
-        .video-window.minimized {
-            height: 50px !important;
-            resize: none;
-        }
-
-        .video-window-header {
-            background: rgba(0, 0, 0, 0.8);
-            padding: 8px 12px;
-            cursor: move;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-        }
-
-        .video-window-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .video-window-controls {
-            display: flex;
-            gap: 8px;
-        }
-
-        .video-window-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-
-        .video-window-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .video-window-btn.close:hover {
-            background: #ef4444;
-        }
-
-        .video-window video {
-            width: 100%;
-            height: calc(100% - 40px);
-            object-fit: cover;
-            display: block;
-        }
-
-        .video-window.minimized video {
-            display: none;
-        }
-
-        /* Participants Grid */
-        #participants-grid {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, 200px);
-            gap: 10px;
-            max-width: 420px;
-            z-index: 100;
-        }
-
-        .participant-tile {
-            background: var(--card);
-            border-radius: 8px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-            aspect-ratio: 4/3;
-            position: relative;
-        }
-
-        .participant-tile video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .participant-name {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 4px 8px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        /* Control Bar */
-        #control-bar {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--card);
-            padding: 12px 20px;
-            border-radius: 99px;
-            display: flex;
-            gap: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 1001;
-        }
-
-        .control-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .control-btn:hover {
-            background: var(--primary);
-            transform: scale(1.1);
-        }
-
-        .control-btn.active {
-            background: var(--primary);
-        }
-
-        .control-btn.danger {
-            background: #ef4444;
-        }
-
-        .control-btn.danger:hover {
-            background: #dc2626;
-        }
     </style>
 </head>
 
@@ -398,97 +241,73 @@
         </div>
     </div>
 
-    <!-- CONTROL BAR (shown during active session) -->
-    <div id="control-bar" style="display:none;">
-        <button class="control-btn" id="mic-btn" onclick="toggleMic()" title="Toggle Microphone">
-            <i data-lucide="mic" style="width:24px; height:24px;"></i>
-        </button>
-        <button class="control-btn" id="camera-btn" onclick="toggleCamera()" title="Toggle Camera">
-            <i data-lucide="video" style="width:24px; height:24px;"></i>
-        </button>
-        <button class="control-btn" id="screen-btn" onclick="toggleScreenShare()" title="Toggle Screen Share">
-            <i data-lucide="monitor" style="width:24px; height:24px;"></i>
-        </button>
-        <button class="control-btn danger" onclick="leaveRoom()" title="Leave Room">
-            <i data-lucide="phone-off" style="width:24px; height:24px;"></i>
-        </button>
-    </div>
-
-    <!-- PARTICIPANTS GRID (for host view) -->
-    <div id="participants-grid"></div>
-
-    <!-- FLOATING VIDEO WINDOWS CONTAINER -->
-    <div id="video-windows-container"></div>
-
-    <!-- Conference Module -->
-    <script src="conference.js"></script>
-
     <script>
         lucide.createIcons();
         const params = new URLSearchParams(window.location.search);
         const roomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
 
-        // Show appropriate view
-        if (roomId) {
-            // Client joining a room
-            showView('room-view');
-            document.getElementById('room-pc-setup').style.display = 'none';
-            document.getElementById('media-container').style.display = 'block';
+        // Connect to your OWN Node.js PeerServer
+        const isSecure = window.location.protocol === 'https:';
+        const peer = new Peer(undefined, {
+            host: window.location.hostname,
+            port: window.location.port || (isSecure ? 443 : 80),
+            path: '/peerjs',
+            secure: isSecure
+        });
 
-            // Initialize conference as client
-            QuickShareConference.init(roomId, false).catch(err => {
-                console.error('Failed to join room:', err);
-                alert('Failed to join room: ' + err.message);
-            });
+        if (roomId) {
+            showView('client-view');
+            document.getElementById('target-room-text').innerText = "Room ID: " + roomId.substring(0, 5).toUpperCase();
         } else if (isJoinMode) {
             showView('manual-join-view');
         } else {
-            // Host creating a room
-            showView('room-view');
-
-            // Initialize conference as host
-            QuickShareConference.init(null, true).catch(err => {
-                console.error('Failed to create room:', err);
-                alert('Failed to create room: ' + err.message);
-            });
+            initHost();
         }
 
         function showView(id) {
-            ['room-view', 'client-view', 'manual-join-view'].forEach(v => {
-                const el = document.getElementById(v);
-                if (el) el.style.display = 'none';
-            });
-            const view = document.getElementById(id);
-            if (view) view.style.display = 'flex';
+            ['room-view', 'client-view', 'manual-join-view'].forEach(v => document.getElementById(v).style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
         }
 
         function submitJoin() {
-            const val = document.getElementById('manual-input').value.trim().toUpperCase();
-            if (!val) {
-                alert('Please enter a room code');
-                return;
-            }
-            window.location.search = '?room=' + val;
+            const val = document.getElementById('manual-input').value;
+            if (val) window.location.search = '?room=' + val;
         }
 
-        // Control functions
-        function toggleMic() {
-            QuickShareConference.toggleMic();
+        function initHost() {
+            peer.on('open', (id) => {
+                document.getElementById('id-display').innerText = id.substring(0, 5).toUpperCase();
+                const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
+                document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
+                new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
+                startCam();
+            });
+
+            peer.on('call', call => {
+                call.answer();
+                call.on('stream', stream => {
+                    document.getElementById('room-pc-setup').style.display = 'none';
+                    document.getElementById('media-container').style.display = 'block';
+                    document.getElementById('remote-video').srcObject = stream;
+                });
+            });
         }
 
-        function toggleCamera() {
-            QuickShareConference.toggleCamera();
+        async function startCam() {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('room-webcam').srcObject = s;
+            } catch (e) { }
         }
 
-        function toggleScreenShare() {
-            QuickShareConference.toggleScreenShare();
-        }
-
-        function leaveRoom() {
-            if (confirm('Are you sure you want to leave the room?')) {
-                QuickShareConference.leaveRoom();
-            }
+        async function startSharing() {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const call = peer.call(roomId, stream);
+                document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE SHARING</b>';
+                stream.getVideoTracks()[0].onended = () => location.reload();
+            } catch (e) { alert("Error: " + e.message); }
         }
     </script>
 </body>
