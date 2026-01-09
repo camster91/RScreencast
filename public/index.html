@@ -251,8 +251,8 @@
         const isSecure = window.location.protocol === 'https:';
 
         // Peer configuration for production/HTTPS deployment
-        // Note: PeerJS client automatically appends '/peerjs' to the path
-        // Since server is mounted at /peerjs, we use path: '/' here
+        // PeerJS client constructs URLs as: path + key + action
+        // With path '/' and default key 'peerjs', URLs are /peerjs/id, /peerjs/peers, etc.
         const peerConfig = {
             host: window.location.hostname,
             path: '/',

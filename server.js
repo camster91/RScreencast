@@ -28,15 +28,17 @@ server.listen(port, () => {
     console.log(`================================================`);
 });
 
+// Serve static files FIRST (but not for /peerjs routes)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Initialize the PeerServer
+// Client uses path '/' which results in URLs like /peerjs/id (path + key + action)
+// So server should mount at root with path '/' to get routes at /:key/id
 const peerServer = ExpressPeerServer(server, {
     debug: true,
     path: '/',
     proxied: true
 });
 
-// Mount signaling server BEFORE static files
-app.use('/peerjs', peerServer);
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Mount signaling server - this catches /:key/* routes like /peerjs/id
+app.use(peerServer);
