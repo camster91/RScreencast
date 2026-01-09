@@ -112,19 +112,6 @@
             object-fit: contain;
         }
 
-        #room-webcam {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            width: 280px;
-            aspect-ratio: 16/9;
-            border-radius: 12px;
-            background: #000;
-            border: 2px solid var(--primary);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-            z-index: 100;
-            object-fit: cover;
-        }
 
         #client-view,
         #manual-join-view {
@@ -215,7 +202,6 @@
 
         <div id="media-container">
             <video id="remote-video" autoplay playsinline></video>
-            <video id="room-webcam" autoplay playsinline muted></video>
         </div>
     </div>
 
@@ -250,21 +236,77 @@
         // Use PeerJS Cloud server (free hosted signaling server)
         // This avoids WebSocket hosting limitations on shared hosting
         console.log('Using PeerJS Cloud server');
-        const peer = new Peer(undefined, { debug: 2 });
+        document.getElementById('url-helper').innerHTML = 'Connecting to PeerJS cloud...';
+
+        // Generate a short 5-character room code for easy sharing
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid confusing chars like 0/O, 1/I
+            let code = '';
+            for (let i = 0; i < 5; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        // If joining a room, use random ID. If hosting, use the room code as peer ID
+        const isHosting = !roomId && !isJoinMode;
+        const myPeerId = isHosting ? generateRoomCode() : undefined;
+
+        const peer = new Peer(myPeerId, {
+            debug: 3, // Max debug level
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
+                ]
+            }
+        });
+
+        // Connection opened successfully
+        peer.on('open', (id) => {
+            console.log('Connected to PeerJS cloud with ID:', id);
+        });
 
         // Add error handling
         peer.on('error', (err) => {
             console.error('Peer error:', err.type, err);
             const urlHelper = document.getElementById('url-helper');
+            const idDisplay = document.getElementById('id-display');
             if (urlHelper) {
-                urlHelper.innerHTML = `<span style="color: #ef4444;">Connection Error: ${err.type}</span>`;
+                urlHelper.innerHTML = `<span style="color: #ef4444;">Error: ${err.type} - ${err.message || 'Connection failed'}</span>`;
+            }
+            if (idDisplay) {
+                idDisplay.innerText = 'ERROR';
+                idDisplay.style.color = '#ef4444';
             }
         });
 
         peer.on('disconnected', () => {
             console.warn('Peer disconnected, attempting to reconnect...');
+            const urlHelper = document.getElementById('url-helper');
+            if (urlHelper) {
+                urlHelper.innerHTML = '<span style="color: orange;">Reconnecting...</span>';
+            }
             peer.reconnect();
         });
+
+        // Connection timeout
+        setTimeout(() => {
+            if (!peer.open) {
+                console.error('Connection timeout - PeerJS cloud not responding');
+                const urlHelper = document.getElementById('url-helper');
+                const idDisplay = document.getElementById('id-display');
+                if (urlHelper) {
+                    urlHelper.innerHTML = '<span style="color: #ef4444;">Connection timeout. Please refresh the page.</span>';
+                }
+                if (idDisplay) {
+                    idDisplay.innerText = 'TIMEOUT';
+                    idDisplay.style.color = '#ef4444';
+                }
+            }
+        }, 10000);
 
         if (roomId) {
             showView('client-view');
@@ -288,22 +330,27 @@
         function initHost() {
             peer.on('open', (id) => {
                 console.log('Peer opened with ID:', id);
-                document.getElementById('id-display').innerText = id.substring(0, 5).toUpperCase();
+                // ID is already a 5-char room code we generated
+                document.getElementById('id-display').innerText = id;
                 const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
                 document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
                 new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
-                startCam();
             });
 
             peer.on('call', call => {
-                console.log('Incoming call from:', call.peer);
+                console.log('=== INCOMING CALL ===');
+                console.log('Call from peer:', call.peer);
+                console.log('Answering call...');
                 call.answer();
 
                 call.on('stream', stream => {
-                    console.log('Received remote stream with tracks:', stream.getTracks().length);
+                    console.log('=== STREAM RECEIVED ===');
+                    console.log('Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.label}`));
                     document.getElementById('room-pc-setup').style.display = 'none';
                     document.getElementById('media-container').style.display = 'block';
-                    document.getElementById('remote-video').srcObject = stream;
+                    const video = document.getElementById('remote-video');
+                    video.srcObject = stream;
+                    video.play().catch(e => console.error('Video play error:', e));
                 });
 
                 call.on('error', (err) => {
@@ -315,35 +362,67 @@
                     document.getElementById('room-pc-setup').style.display = 'flex';
                     document.getElementById('media-container').style.display = 'none';
                 });
-            });
-        }
 
-        async function startCam() {
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('room-webcam').srcObject = s;
-            } catch (e) { }
+                // Monitor connection state on host side
+                call.peerConnection.oniceconnectionstatechange = () => {
+                    console.log('HOST ICE state:', call.peerConnection.iceConnectionState);
+                };
+
+                call.peerConnection.onconnectionstatechange = () => {
+                    console.log('HOST connection state:', call.peerConnection.connectionState);
+                };
+            });
         }
 
         async function startSharing() {
             try {
+                // Wait for peer to be ready
+                if (!peer.open) {
+                    document.getElementById('status-msg').innerHTML = 'Connecting to server...';
+                    await new Promise((resolve) => peer.on('open', resolve));
+                }
+
+                console.log('My peer ID:', peer.id);
                 console.log('Requesting screen share...');
                 const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                console.log('Got screen share stream, calling room:', roomId);
+                console.log('Got screen share stream with tracks:', stream.getTracks().map(t => t.kind));
+                console.log('Calling room ID:', roomId);
 
                 const call = peer.call(roomId, stream);
 
                 if (!call) {
-                    throw new Error('Failed to create call. Check if peer ID is valid.');
+                    throw new Error('Failed to create call. The room ID may be invalid or the host is offline.');
                 }
+
+                console.log('Call object created, waiting for connection...');
+
+                call.on('stream', (remoteStream) => {
+                    console.log('Received response stream from host');
+                });
 
                 call.on('error', (err) => {
                     console.error('Call error:', err);
                     alert('Call error: ' + err.message);
                 });
 
-                console.log('Call initiated successfully');
-                document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE SHARING</b>';
+                call.on('close', () => {
+                    console.log('Call closed by host');
+                });
+
+                // Check connection state
+                call.peerConnection.oniceconnectionstatechange = () => {
+                    console.log('ICE connection state:', call.peerConnection.iceConnectionState);
+                };
+
+                call.peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', call.peerConnection.connectionState);
+                    if (call.peerConnection.connectionState === 'connected') {
+                        document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE - CONNECTED</b>';
+                    }
+                };
+
+                console.log('Call initiated, sharing screen...');
+                document.getElementById('status-msg').innerHTML = '<b style="color:orange">CONNECTING...</b>';
 
                 stream.getVideoTracks()[0].onended = () => {
                     console.log('Screen share ended');
