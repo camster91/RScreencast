@@ -247,27 +247,10 @@
         const roomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
 
-        // Connect to your OWN Node.js PeerServer
-        const isSecure = window.location.protocol === 'https:';
-
-        // Peer configuration for production/HTTPS deployment
-        // PeerJS client constructs URLs as: path + key + action
-        // With path '/' and default key 'peerjs', URLs are /peerjs/id, /peerjs/peers, etc.
-        const peerConfig = {
-            host: window.location.hostname,
-            path: '/',
-            secure: isSecure,
-            debug: 2 // Enable debug logging
-        };
-
-        // Only set port if explicitly specified (for local dev)
-        // Production with reverse proxy should not specify port
-        if (window.location.port) {
-            peerConfig.port = parseInt(window.location.port);
-        }
-
-        console.log('PeerJS Config:', peerConfig);
-        const peer = new Peer(undefined, peerConfig);
+        // Use PeerJS Cloud server (free hosted signaling server)
+        // This avoids WebSocket hosting limitations on shared hosting
+        console.log('Using PeerJS Cloud server');
+        const peer = new Peer(undefined, { debug: 2 });
 
         // Add error handling
         peer.on('error', (err) => {
