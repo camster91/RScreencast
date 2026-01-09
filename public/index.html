@@ -250,31 +250,65 @@
 
         .viewing-controls {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+            top: 15px;
+            left: 15px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
             z-index: 200;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .viewing-controls.minimized {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
+        }
+
+        .viewing-controls .btn {
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
         }
 
         .viewing-info {
-            flex: 1;
-            text-align: center;
             background: rgba(0,0,0,0.7);
-            padding: 10px 15px;
+            padding: 8px 12px;
             border-radius: 8px;
+            font-size: 0.85rem;
         }
 
         .viewing-info #viewing-name {
             font-weight: 600;
-            margin-right: 10px;
         }
 
         .viewing-info #presenter-count {
             color: var(--primary);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+
+        /* Minimized toggle button - always visible */
+        #show-controls-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 201;
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            display: none;
+            transition: background 0.2s;
+        }
+
+        #show-controls-btn:hover {
+            background: rgba(0,0,0,0.8);
+        }
+
+        #show-controls-btn.visible {
+            display: flex;
         }
 
         /* Client sharing controls */
@@ -340,16 +374,25 @@
 
         <div id="media-container">
             <video id="remote-video" autoplay playsinline></video>
-            <div class="viewing-controls">
+
+            <!-- Show controls button (visible when controls hidden) -->
+            <button id="show-controls-btn" onclick="toggleViewingControls()">
+                <i data-lucide="eye" style="width:20px;height:20px;"></i>
+            </button>
+
+            <div class="viewing-controls" id="viewing-controls">
                 <button class="btn btn-danger" onclick="stopViewing()">
-                    <i data-lucide="x"></i> Back to Room
+                    <i data-lucide="x"></i> Exit
                 </button>
                 <div class="viewing-info">
-                    <span id="viewing-name">Viewing: -</span>
+                    <span id="viewing-name">-</span>
                     <span id="presenter-count"></span>
                 </div>
                 <button class="btn btn-secondary" id="switch-presenter-btn" onclick="togglePeerPanel()" style="display: none;">
-                    <i data-lucide="arrow-left-right"></i> Switch Presenter
+                    <i data-lucide="users"></i> Switch
+                </button>
+                <button class="btn btn-secondary" onclick="toggleViewingControls()" title="Hide controls">
+                    <i data-lucide="eye-off"></i>
                 </button>
             </div>
         </div>
@@ -812,7 +855,24 @@
             document.getElementById('floating-controls').style.display = 'flex';
             document.getElementById('media-container').style.display = 'none';
             document.getElementById('remote-video').srcObject = null;
+            // Reset controls visibility
+            document.getElementById('viewing-controls').classList.remove('minimized');
+            document.getElementById('show-controls-btn').classList.remove('visible');
             updatePeerList();
+        }
+
+        function toggleViewingControls() {
+            const controls = document.getElementById('viewing-controls');
+            const showBtn = document.getElementById('show-controls-btn');
+
+            if (controls.classList.contains('minimized')) {
+                controls.classList.remove('minimized');
+                showBtn.classList.remove('visible');
+            } else {
+                controls.classList.add('minimized');
+                showBtn.classList.add('visible');
+            }
+            lucide.createIcons();
         }
 
         // ========== CLIENT FUNCTIONS ==========
