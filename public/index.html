@@ -368,11 +368,16 @@
     <!-- MANUAL JOIN -->
     <div id="manual-join-view">
         <div class="hero-card">
+            <i data-lucide="log-in" style="width:48px; height:48px; color:var(--primary); margin-bottom:1rem;"></i>
             <h2>Enter Room Code</h2>
-            <div style="margin: 1.5rem 0;">
-                <input type="text" id="manual-input" maxlength="5" placeholder="ABCDE">
+            <p style="color:var(--text-dim); margin-bottom:1rem;">Enter the 5-character code shown on the host's screen</p>
+            <div style="margin: 1rem 0;">
+                <input type="text" id="manual-input" maxlength="5" placeholder="ABCDE" onkeyup="validateJoinInput(event)">
             </div>
-            <button class="btn btn-full" onclick="submitJoin()">Join Room</button>
+            <div id="join-error" style="color: var(--danger); font-size: 0.9rem; margin-bottom: 1rem; display: none;"></div>
+            <button class="btn btn-full" id="join-submit-btn" onclick="submitJoin()">
+                <i data-lucide="arrow-right"></i> Join Room
+            </button>
         </div>
     </div>
 
@@ -528,9 +533,40 @@
             lucide.createIcons();
         }
 
+        function validateJoinInput(event) {
+            const input = document.getElementById('manual-input');
+            const errorEl = document.getElementById('join-error');
+
+            // Auto-uppercase and filter invalid characters
+            input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+            // Hide error while typing
+            errorEl.style.display = 'none';
+
+            // Submit on Enter key
+            if (event && event.key === 'Enter') {
+                submitJoin();
+            }
+        }
+
         function submitJoin() {
-            const val = document.getElementById('manual-input').value.toUpperCase();
-            if (val) window.location.search = '?room=' + val;
+            const val = document.getElementById('manual-input').value.toUpperCase().trim();
+            const errorEl = document.getElementById('join-error');
+
+            if (!val) {
+                errorEl.innerText = 'Please enter a room code';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            if (val.length < 5) {
+                errorEl.innerText = 'Room codes are 5 characters long';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // Valid code, redirect to join
+            window.location.search = '?room=' + val;
         }
 
         function togglePeerPanel() {
@@ -794,7 +830,10 @@
         async function startSharing() {
             try {
                 if (!peer.open) {
-                    await new Promise((resolve) => peer.on('open', resolve));
+                    await new Promise((resolve, reject) => {
+                        peer.on('open', resolve);
+                        setTimeout(() => reject(new Error('Connection timeout')), 10000);
+                    });
                 }
 
                 showClientState('share-waiting');
@@ -802,14 +841,37 @@
                 // First establish data connection
                 clientConn = peer.connect(roomId);
 
+                // Set timeout for connection - if room doesn't exist, connection won't open
+                let connectionTimeout = setTimeout(() => {
+                    console.error('Connection timeout - room may not exist');
+                    document.getElementById('error-message').innerText =
+                        'Room "' + roomId.toUpperCase() + '" not found. The room may have closed or the code is incorrect.';
+                    showClientState('share-error');
+                    if (clientConn) clientConn.close();
+                }, 8000);
+
+                let connected = false;
+
                 clientConn.on('open', () => {
+                    connected = true;
+                    clearTimeout(connectionTimeout);
                     clientConn.send({
                         type: 'join-request',
                         name: 'Presenter ' + peer.id.substring(0, 4).toUpperCase()
                     });
+
+                    // Set another timeout for host response
+                    connectionTimeout = setTimeout(() => {
+                        if (document.getElementById('share-waiting').style.display !== 'none') {
+                            document.getElementById('error-message').innerText =
+                                'Host is not responding. They may have left the room.';
+                            showClientState('share-error');
+                        }
+                    }, 30000);
                 });
 
                 clientConn.on('data', async (data) => {
+                    clearTimeout(connectionTimeout);
                     console.log('Received from host:', data);
 
                     if (data.type === 'approved') {
@@ -823,9 +885,28 @@
                 });
 
                 clientConn.on('error', (err) => {
+                    clearTimeout(connectionTimeout);
                     console.error('Connection error:', err);
-                    document.getElementById('error-message').innerText = 'Could not connect to room. Check the room code and try again.';
+
+                    // Check for specific error types
+                    if (err.type === 'peer-unavailable') {
+                        document.getElementById('error-message').innerText =
+                            'Room "' + roomId.toUpperCase() + '" not found. Check the code and try again.';
+                    } else {
+                        document.getElementById('error-message').innerText =
+                            'Could not connect to room. Please check the room code and try again.';
+                    }
                     showClientState('share-error');
+                });
+
+                clientConn.on('close', () => {
+                    clearTimeout(connectionTimeout);
+                    // Only show error if we weren't already showing a different state
+                    if (!connected && document.getElementById('share-waiting').style.display !== 'none') {
+                        document.getElementById('error-message').innerText =
+                            'Connection closed. The room may no longer be available.';
+                        showClientState('share-error');
+                    }
                 });
 
             } catch (e) {
