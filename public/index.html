@@ -14,16 +14,14 @@
             --card: #1e293b;
             --primary: #22c55e;
             --primary-hover: #16a34a;
+            --danger: #ef4444;
+            --warning: #f59e0b;
             --text: #f8fafc;
             --text-dim: #94a3b8;
             --input-bg: #334155;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -35,9 +33,9 @@
             overflow: hidden;
         }
 
-        #room-view {
+        #room-view, #client-view, #manual-join-view {
             flex: 1;
-            display: flex;
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -112,44 +110,29 @@
             object-fit: contain;
         }
 
-
-        #client-view,
-        #manual-join-view {
-            display: none;
-            padding: 2rem;
-            text-align: center;
-            height: 100vh;
-            justify-content: center;
-            flex-direction: column;
-            align-items: center;
-        }
-
         .btn {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 1.2rem 2.5rem;
-            font-size: 1.2rem;
+            padding: 1rem 2rem;
+            font-size: 1rem;
             font-weight: 700;
-            border-radius: 16px;
+            border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 12px;
-            width: 100%;
+            gap: 8px;
             justify-content: center;
         }
 
-        .btn:hover {
-            background: var(--primary-hover);
-            transform: translateY(-2px);
-        }
-
-        .input-group {
-            margin: 1.5rem 0;
-            text-align: left;
-        }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: var(--input-bg); }
+        .btn-secondary:hover { background: #475569; }
+        .btn-small { padding: 0.5rem 1rem; font-size: 0.85rem; }
+        .btn-full { width: 100%; }
 
         input {
             width: 100%;
@@ -163,31 +146,179 @@
             text-transform: uppercase;
         }
 
-        .loader {
-            width: 48px;
-            height: 48px;
-            border: 5px solid #FFF;
-            border-bottom-color: var(--primary);
+        /* Peer Panel - Hidden by default */
+        #peer-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 300px;
+            max-height: 70vh;
+            background: var(--card);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 300;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #peer-panel.visible { display: block; }
+
+        .peer-panel-header {
+            padding: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .peer-panel-header h3 { font-size: 0.9rem; }
+
+        .peer-list { max-height: 400px; overflow-y: auto; }
+
+        .peer-item {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .peer-item:hover { background: rgba(255,255,255,0.05); }
+        .peer-item.active { background: rgba(34, 197, 94, 0.2); border-left: 3px solid var(--primary); }
+        .peer-item.pending { background: rgba(245, 158, 11, 0.2); }
+
+        .peer-info { flex: 1; }
+        .peer-name { font-weight: 600; font-size: 0.9rem; }
+        .peer-status { font-size: 0.75rem; color: var(--text-dim); }
+
+        .peer-actions { display: flex; gap: 5px; }
+
+        /* Floating buttons */
+        .floating-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 50;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.7rem;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            display: inline-block;
-            animation: rotation 1s linear infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        @keyframes rotation {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+        /* Approval Dialog */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
         }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h3 { margin-bottom: 1rem; }
+        .modal p { color: var(--text-dim); margin-bottom: 1.5rem; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-buttons .btn { flex: 1; }
+
+        .viewing-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 200;
+        }
+
+        .viewing-info {
+            flex: 1;
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+
+        .viewing-info #viewing-name {
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .viewing-info #presenter-count {
+            color: var(--primary);
+            font-size: 0.85rem;
+        }
+
+        /* Client sharing controls */
+        .share-status-card {
+            background: rgba(34, 197, 94, 0.1);
+            border: 2px solid var(--primary);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-top: 1rem;
+        }
+
+        .share-status-card.waiting {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+        }
+
+        .share-status-card.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+        }
+
+        .share-status-card h4 {
+            margin-bottom: 0.5rem;
+        }
+
+        .share-status-card p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .button-group .btn { flex: 1; }
     </style>
 </head>
 
 <body>
 
-    <!-- ROOM PC MODE -->
+    <!-- ROOM PC MODE (HOST) -->
     <div id="room-view">
         <div id="room-pc-setup" class="hero-card">
             <div class="room-badge"><i data-lucide="radio"></i> LIVE MEETING ROOM</div>
@@ -195,13 +326,42 @@
             <div id="qrcode"></div>
             <div class="id-display" id="id-display">...</div>
             <div class="url-helper" id="url-helper">Loading connection...</div>
-            <button class="btn"
-                style="margin-top:1rem; background:transparent; border:1px solid var(--text-dim); font-size: 0.9rem;"
-                onclick="location.search='?mode=join'">Manual Join</button>
+            <button class="btn btn-secondary btn-small" style="margin-top:1rem;" onclick="location.search='?mode=join'">
+                <i data-lucide="log-in"></i> Join as Presenter
+            </button>
+        </div>
+
+        <div class="floating-controls" id="floating-controls">
+            <button class="btn btn-secondary btn-small" onclick="togglePeerPanel()" id="participants-btn" style="position: relative;">
+                <i data-lucide="users"></i> Participants
+                <span class="notification-badge" id="pending-badge" style="display: none;">0</span>
+            </button>
         </div>
 
         <div id="media-container">
             <video id="remote-video" autoplay playsinline></video>
+            <div class="viewing-controls">
+                <button class="btn btn-danger" onclick="stopViewing()">
+                    <i data-lucide="x"></i> Back to Room
+                </button>
+                <div class="viewing-info">
+                    <span id="viewing-name">Viewing: -</span>
+                    <span id="presenter-count"></span>
+                </div>
+                <button class="btn btn-secondary" id="switch-presenter-btn" onclick="togglePeerPanel()" style="display: none;">
+                    <i data-lucide="arrow-left-right"></i> Switch Presenter
+                </button>
+            </div>
+        </div>
+
+        <div id="peer-panel">
+            <div class="peer-panel-header">
+                <h3>Participants</h3>
+                <button class="btn btn-secondary btn-small" onclick="togglePeerPanel()">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <div class="peer-list" id="peer-list"></div>
         </div>
     </div>
 
@@ -209,21 +369,101 @@
     <div id="manual-join-view">
         <div class="hero-card">
             <h2>Enter Room Code</h2>
-            <div class="input-group">
+            <div style="margin: 1.5rem 0;">
                 <input type="text" id="manual-input" maxlength="5" placeholder="ABCDE">
             </div>
-            <button class="btn" onclick="submitJoin()">Join Room</button>
+            <button class="btn btn-full" onclick="submitJoin()">Join Room</button>
         </div>
     </div>
 
     <!-- CLIENT SHARE -->
     <div id="client-view">
         <div class="hero-card">
-            <i data-lucide="monitor-up" style="width:64px; height:64px; color:var(--primary); margin-bottom:1rem;"></i>
-            <h2>Sharing to Room</h2>
-            <p id="target-room-text" style="color:var(--text-dim); margin-bottom:2rem;"></p>
-            <button class="btn" id="share-btn" onclick="startSharing()">Start Screen Share</button>
-            <div id="status-msg" style="margin-top:2rem; color:var(--text-dim);"></div>
+            <div id="share-initial">
+                <i data-lucide="monitor-up" style="width:64px; height:64px; color:var(--primary); margin-bottom:1rem;"></i>
+                <h2>Share Your Screen</h2>
+                <p id="target-room-text" style="color:var(--text-dim); margin-bottom:1.5rem;"></p>
+                <button class="btn btn-full" id="join-btn" onclick="startSharing()">
+                    <i data-lucide="hand"></i> Request to Join
+                </button>
+            </div>
+
+            <div id="share-waiting" style="display: none;">
+                <div class="share-status-card waiting">
+                    <h4><i data-lucide="clock" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;"></i> Waiting for Host</h4>
+                    <p>The host needs to approve your request before you can share.</p>
+                </div>
+            </div>
+
+            <div id="share-approved" style="display: none;">
+                <i data-lucide="check-circle" style="width:48px; height:48px; color:var(--primary); margin-bottom:1rem;"></i>
+                <h2>You're Approved!</h2>
+                <p style="color:var(--text-dim); margin-bottom:1.5rem;">Click below to select which screen or window to share.</p>
+                <button class="btn btn-full" id="select-screen-btn" onclick="shareScreen()">
+                    <i data-lucide="monitor"></i> Select Screen to Share
+                </button>
+            </div>
+
+            <div id="share-live" style="display: none;">
+                <div class="share-status-card">
+                    <h4><i data-lucide="radio" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;color:var(--primary);"></i> LIVE - Sharing Your Screen</h4>
+                    <p>The host can now see your screen. Click below to stop sharing.</p>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-danger" onclick="stopSharing()">
+                        <i data-lucide="square"></i> Stop Sharing
+                    </button>
+                </div>
+            </div>
+
+            <div id="share-ended" style="display: none;">
+                <i data-lucide="monitor-x" style="width:48px; height:48px; color:var(--text-dim); margin-bottom:1rem;"></i>
+                <h2>Screen Share Ended</h2>
+                <p style="color:var(--text-dim); margin-bottom:1.5rem;">Your screen share has stopped. You can share a different screen or window if needed.</p>
+                <button class="btn btn-full" onclick="shareScreen()">
+                    <i data-lucide="monitor-up"></i> Share Another Screen
+                </button>
+            </div>
+
+            <div id="share-denied" style="display: none;">
+                <i data-lucide="x-circle" style="width:48px; height:48px; color:var(--danger); margin-bottom:1rem;"></i>
+                <h2>Request Denied</h2>
+                <p style="color:var(--text-dim); margin-bottom:1.5rem;">The host did not allow you to join this session.</p>
+                <button class="btn btn-secondary btn-full" onclick="window.location.reload()">
+                    <i data-lucide="refresh-cw"></i> Try Again
+                </button>
+            </div>
+
+            <div id="share-kicked" style="display: none;">
+                <i data-lucide="user-x" style="width:48px; height:48px; color:var(--danger); margin-bottom:1rem;"></i>
+                <h2>Removed from Room</h2>
+                <p style="color:var(--text-dim); margin-bottom:1.5rem;">You were removed from the session by the host.</p>
+                <button class="btn btn-secondary btn-full" onclick="window.location.reload()">
+                    <i data-lucide="refresh-cw"></i> Rejoin Room
+                </button>
+            </div>
+
+            <div id="share-error" style="display: none;">
+                <div class="share-status-card error">
+                    <h4><i data-lucide="alert-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;"></i> Connection Error</h4>
+                    <p id="error-message">Could not connect to the room.</p>
+                </div>
+                <button class="btn btn-secondary btn-full" style="margin-top:1rem;" onclick="window.location.reload()">
+                    <i data-lucide="refresh-cw"></i> Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPROVAL MODAL -->
+    <div class="modal-overlay" id="approval-modal">
+        <div class="modal">
+            <h3>New Presenter Request</h3>
+            <p><strong id="requester-name">Someone</strong> wants to share their screen</p>
+            <div class="modal-buttons">
+                <button class="btn btn-danger" onclick="handleApproval(false)">Deny</button>
+                <button class="btn" onclick="handleApproval(true)">Allow</button>
+            </div>
         </div>
     </div>
 
@@ -233,14 +473,14 @@
         const roomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
 
-        // Use PeerJS Cloud server (free hosted signaling server)
-        // This avoids WebSocket hosting limitations on shared hosting
-        console.log('Using PeerJS Cloud server');
-        document.getElementById('url-helper').innerHTML = 'Connecting to PeerJS cloud...';
+        // Room state
+        let connectedPeers = new Map(); // peerId -> { conn, call, stream, name, approved }
+        let currentViewingPeer = null;
+        let pendingApprovals = [];
 
-        // Generate a short 5-character room code for easy sharing
+        // Generate a short 5-character room code
         function generateRoomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid confusing chars like 0/O, 1/I
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let code = '';
             for (let i = 0; i < 5; i++) {
                 code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -248,190 +488,381 @@
             return code;
         }
 
-        // If joining a room, use random ID. If hosting, use the room code as peer ID
+        // Determine mode
         const isHosting = !roomId && !isJoinMode;
         const myPeerId = isHosting ? generateRoomCode() : undefined;
 
+        console.log('Mode:', isHosting ? 'HOST' : (roomId ? 'CLIENT' : 'JOIN'));
+
         const peer = new Peer(myPeerId, {
-            debug: 3, // Max debug level
+            debug: 2,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
                     { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
         });
 
-        // Connection opened successfully
-        peer.on('open', (id) => {
-            console.log('Connected to PeerJS cloud with ID:', id);
-        });
+        peer.on('open', (id) => console.log('Connected with ID:', id));
+        peer.on('error', (err) => console.error('Peer error:', err));
+        peer.on('disconnected', () => peer.reconnect());
 
-        // Add error handling
-        peer.on('error', (err) => {
-            console.error('Peer error:', err.type, err);
-            const urlHelper = document.getElementById('url-helper');
-            const idDisplay = document.getElementById('id-display');
-            if (urlHelper) {
-                urlHelper.innerHTML = `<span style="color: #ef4444;">Error: ${err.type} - ${err.message || 'Connection failed'}</span>`;
-            }
-            if (idDisplay) {
-                idDisplay.innerText = 'ERROR';
-                idDisplay.style.color = '#ef4444';
-            }
-        });
-
-        peer.on('disconnected', () => {
-            console.warn('Peer disconnected, attempting to reconnect...');
-            const urlHelper = document.getElementById('url-helper');
-            if (urlHelper) {
-                urlHelper.innerHTML = '<span style="color: orange;">Reconnecting...</span>';
-            }
-            peer.reconnect();
-        });
-
-        // Connection timeout
-        setTimeout(() => {
-            if (!peer.open) {
-                console.error('Connection timeout - PeerJS cloud not responding');
-                const urlHelper = document.getElementById('url-helper');
-                const idDisplay = document.getElementById('id-display');
-                if (urlHelper) {
-                    urlHelper.innerHTML = '<span style="color: #ef4444;">Connection timeout. Please refresh the page.</span>';
-                }
-                if (idDisplay) {
-                    idDisplay.innerText = 'TIMEOUT';
-                    idDisplay.style.color = '#ef4444';
-                }
-            }
-        }, 10000);
-
+        // Route to correct view
         if (roomId) {
             showView('client-view');
-            document.getElementById('target-room-text').innerText = "Room ID: " + roomId.substring(0, 5).toUpperCase();
+            document.getElementById('target-room-text').innerText = "Room: " + roomId.toUpperCase();
         } else if (isJoinMode) {
             showView('manual-join-view');
         } else {
+            showView('room-view');
             initHost();
         }
 
         function showView(id) {
-            ['room-view', 'client-view', 'manual-join-view'].forEach(v => document.getElementById(v).style.display = 'none');
+            ['room-view', 'client-view', 'manual-join-view'].forEach(v => {
+                document.getElementById(v).style.display = 'none';
+            });
             document.getElementById(id).style.display = 'flex';
+            lucide.createIcons();
         }
 
         function submitJoin() {
-            const val = document.getElementById('manual-input').value;
+            const val = document.getElementById('manual-input').value.toUpperCase();
             if (val) window.location.search = '?room=' + val;
         }
 
+        function togglePeerPanel() {
+            document.getElementById('peer-panel').classList.toggle('visible');
+        }
+
+        // ========== HOST FUNCTIONS ==========
         function initHost() {
             peer.on('open', (id) => {
-                console.log('Peer opened with ID:', id);
-                // ID is already a 5-char room code we generated
                 document.getElementById('id-display').innerText = id;
                 const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
                 document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
                 new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
+                lucide.createIcons();
             });
 
-            peer.on('call', call => {
-                console.log('=== INCOMING CALL ===');
-                console.log('Call from peer:', call.peer);
-                console.log('Answering call...');
+            // Handle data connections (for approval)
+            peer.on('connection', (conn) => {
+                console.log('Data connection from:', conn.peer);
+
+                conn.on('open', () => {
+                    conn.on('data', (data) => handlePeerMessage(conn, data));
+                });
+            });
+
+            // Handle media calls
+            peer.on('call', (call) => {
+                console.log('Incoming call from:', call.peer);
+
+                const peerData = connectedPeers.get(call.peer);
+                if (!peerData || !peerData.approved) {
+                    console.log('Call from unapproved peer, ignoring');
+                    return;
+                }
+
                 call.answer();
 
-                call.on('stream', stream => {
-                    console.log('=== STREAM RECEIVED ===');
-                    console.log('Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.label}`));
-                    document.getElementById('room-pc-setup').style.display = 'none';
-                    document.getElementById('media-container').style.display = 'block';
-                    const video = document.getElementById('remote-video');
-                    video.srcObject = stream;
-                    video.play().catch(e => console.error('Video play error:', e));
-                });
+                call.on('stream', (stream) => {
+                    console.log('Stream received from:', call.peer);
+                    peerData.stream = stream;
+                    peerData.call = call;
+                    updatePeerList();
 
-                call.on('error', (err) => {
-                    console.error('Call error:', err);
+                    // Auto-view if first presenter or only one
+                    if (!currentViewingPeer) {
+                        viewPeer(call.peer);
+                    }
                 });
 
                 call.on('close', () => {
-                    console.log('Call closed');
-                    document.getElementById('room-pc-setup').style.display = 'flex';
-                    document.getElementById('media-container').style.display = 'none';
+                    console.log('Call closed:', call.peer);
+                    if (currentViewingPeer === call.peer) {
+                        stopViewing();
+                    }
+                    if (peerData) {
+                        peerData.stream = null;
+                        peerData.call = null;
+                    }
+                    updatePeerList();
+                });
+            });
+        }
+
+        function handlePeerMessage(conn, data) {
+            console.log('Message from', conn.peer, ':', data);
+
+            if (data.type === 'join-request') {
+                // Add to connected peers as pending
+                connectedPeers.set(conn.peer, {
+                    conn: conn,
+                    name: data.name || 'Presenter',
+                    approved: false,
+                    stream: null,
+                    call: null
                 });
 
-                // Monitor connection state on host side
-                call.peerConnection.oniceconnectionstatechange = () => {
-                    console.log('HOST ICE state:', call.peerConnection.iceConnectionState);
-                };
+                // Add to pending approvals and show dialog
+                pendingApprovals.push(conn.peer);
+                updatePendingBadge();
+                showNextApproval();
+                updatePeerList();
+            }
+        }
 
-                call.peerConnection.onconnectionstatechange = () => {
-                    console.log('HOST connection state:', call.peerConnection.connectionState);
-                };
+        function showNextApproval() {
+            if (pendingApprovals.length === 0) return;
+            if (document.getElementById('approval-modal').classList.contains('active')) return;
+
+            const peerId = pendingApprovals[0];
+            const peerData = connectedPeers.get(peerId);
+            if (peerData) {
+                document.getElementById('requester-name').innerText = peerData.name;
+                document.getElementById('approval-modal').classList.add('active');
+            }
+        }
+
+        function handleApproval(approved) {
+            document.getElementById('approval-modal').classList.remove('active');
+
+            if (pendingApprovals.length > 0) {
+                const peerId = pendingApprovals.shift();
+                const peerData = connectedPeers.get(peerId);
+
+                if (peerData) {
+                    if (approved) {
+                        peerData.approved = true;
+                        peerData.conn.send({ type: 'approved' });
+                    } else {
+                        peerData.conn.send({ type: 'denied' });
+                        peerData.conn.close();
+                        connectedPeers.delete(peerId);
+                    }
+                    updatePeerList();
+                }
+
+                updatePendingBadge();
+                // Show next approval if any
+                setTimeout(showNextApproval, 300);
+            }
+        }
+
+        function updatePendingBadge() {
+            const badge = document.getElementById('pending-badge');
+            const count = pendingApprovals.length;
+            if (count > 0) {
+                badge.style.display = 'flex';
+                badge.innerText = count;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function updatePeerList() {
+            const list = document.getElementById('peer-list');
+
+            let html = '';
+            let count = 0;
+            let streamCount = 0;
+
+            connectedPeers.forEach((data, peerId) => {
+                count++;
+                const isActive = currentViewingPeer === peerId;
+                const isPending = !data.approved;
+                const hasStream = !!data.stream;
+                if (hasStream) streamCount++;
+
+                let statusText = 'Connected';
+                if (isPending) {
+                    statusText = 'Waiting for approval...';
+                } else if (hasStream) {
+                    statusText = isActive ? '● Currently viewing' : 'Click to view screen';
+                }
+
+                html += `
+                    <div class="peer-item ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}"
+                         onclick="${hasStream ? `viewPeer('${peerId}')` : ''}"
+                         style="${hasStream && !isActive ? 'cursor: pointer;' : ''}">
+                        <div class="peer-info">
+                            <div class="peer-name">${data.name}</div>
+                            <div class="peer-status">${statusText}</div>
+                        </div>
+                        <div class="peer-actions">
+                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); kickPeer('${peerId}')" title="Remove">
+                                <i data-lucide="x" style="width:14px;height:14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
             });
+
+            if (count === 0) {
+                html = '<div style="padding: 1rem; color: var(--text-dim); text-align: center;">No participants yet</div>';
+            } else if (streamCount > 1) {
+                html = '<div style="padding: 0.5rem 1rem; background: rgba(34, 197, 94, 0.1); color: var(--primary); font-size: 0.8rem; text-align: center;">Click a presenter to switch view</div>' + html;
+            }
+
+            list.innerHTML = html;
+
+            // Update button text
+            document.querySelector('#participants-btn').innerHTML = `
+                <i data-lucide="users"></i> Participants (${count})
+                <span class="notification-badge" id="pending-badge" style="display: ${pendingApprovals.length ? 'flex' : 'none'};">${pendingApprovals.length}</span>
+            `;
+            lucide.createIcons();
+        }
+
+        function kickPeer(peerId) {
+            const peerData = connectedPeers.get(peerId);
+            if (peerData) {
+                peerData.conn.send({ type: 'kicked' });
+                if (peerData.call) peerData.call.close();
+                peerData.conn.close();
+                connectedPeers.delete(peerId);
+
+                // Remove from pending if there
+                pendingApprovals = pendingApprovals.filter(id => id !== peerId);
+                updatePendingBadge();
+
+                if (currentViewingPeer === peerId) {
+                    stopViewing();
+                }
+                updatePeerList();
+            }
+        }
+
+        function viewPeer(peerId) {
+            const peerData = connectedPeers.get(peerId);
+            if (!peerData || !peerData.stream) return;
+
+            currentViewingPeer = peerId;
+            document.getElementById('room-pc-setup').style.display = 'none';
+            document.getElementById('floating-controls').style.display = 'none';
+            document.getElementById('media-container').style.display = 'block';
+            document.getElementById('remote-video').srcObject = peerData.stream;
+
+            // Update viewing info
+            document.getElementById('viewing-name').innerText = 'Viewing: ' + peerData.name;
+
+            // Count presenters with active streams
+            let presenterCount = 0;
+            connectedPeers.forEach((data) => {
+                if (data.stream) presenterCount++;
+            });
+
+            // Show switch button only if multiple presenters
+            const switchBtn = document.getElementById('switch-presenter-btn');
+            const countEl = document.getElementById('presenter-count');
+            if (presenterCount > 1) {
+                switchBtn.style.display = 'inline-flex';
+                countEl.innerText = `(${presenterCount} presenters active)`;
+            } else {
+                switchBtn.style.display = 'none';
+                countEl.innerText = '';
+            }
+
+            updatePeerList();
+            lucide.createIcons();
+        }
+
+        function stopViewing() {
+            currentViewingPeer = null;
+            document.getElementById('room-pc-setup').style.display = 'flex';
+            document.getElementById('floating-controls').style.display = 'flex';
+            document.getElementById('media-container').style.display = 'none';
+            document.getElementById('remote-video').srcObject = null;
+            updatePeerList();
+        }
+
+        // ========== CLIENT FUNCTIONS ==========
+        let currentStream = null;
+        let clientConn = null;
+
+        function showClientState(state) {
+            const states = ['share-initial', 'share-waiting', 'share-approved', 'share-live', 'share-ended', 'share-denied', 'share-kicked', 'share-error'];
+            states.forEach(s => {
+                document.getElementById(s).style.display = s === state ? 'block' : 'none';
+            });
+            lucide.createIcons();
         }
 
         async function startSharing() {
             try {
-                // Wait for peer to be ready
                 if (!peer.open) {
-                    document.getElementById('status-msg').innerHTML = 'Connecting to server...';
                     await new Promise((resolve) => peer.on('open', resolve));
                 }
 
-                console.log('My peer ID:', peer.id);
-                console.log('Requesting screen share...');
-                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                console.log('Got screen share stream with tracks:', stream.getTracks().map(t => t.kind));
-                console.log('Calling room ID:', roomId);
+                showClientState('share-waiting');
 
-                const call = peer.call(roomId, stream);
+                // First establish data connection
+                clientConn = peer.connect(roomId);
 
-                if (!call) {
-                    throw new Error('Failed to create call. The room ID may be invalid or the host is offline.');
-                }
-
-                console.log('Call object created, waiting for connection...');
-
-                call.on('stream', (remoteStream) => {
-                    console.log('Received response stream from host');
+                clientConn.on('open', () => {
+                    clientConn.send({
+                        type: 'join-request',
+                        name: 'Presenter ' + peer.id.substring(0, 4).toUpperCase()
+                    });
                 });
 
-                call.on('error', (err) => {
-                    console.error('Call error:', err);
-                    alert('Call error: ' + err.message);
-                });
+                clientConn.on('data', async (data) => {
+                    console.log('Received from host:', data);
 
-                call.on('close', () => {
-                    console.log('Call closed by host');
-                });
-
-                // Check connection state
-                call.peerConnection.oniceconnectionstatechange = () => {
-                    console.log('ICE connection state:', call.peerConnection.iceConnectionState);
-                };
-
-                call.peerConnection.onconnectionstatechange = () => {
-                    console.log('Connection state:', call.peerConnection.connectionState);
-                    if (call.peerConnection.connectionState === 'connected') {
-                        document.getElementById('status-msg').innerHTML = '<b style="color:var(--primary)">LIVE - CONNECTED</b>';
+                    if (data.type === 'approved') {
+                        showClientState('share-approved');
+                    } else if (data.type === 'denied') {
+                        showClientState('share-denied');
+                    } else if (data.type === 'kicked') {
+                        stopSharing();
+                        showClientState('share-kicked');
                     }
-                };
+                });
 
-                console.log('Call initiated, sharing screen...');
-                document.getElementById('status-msg').innerHTML = '<b style="color:orange">CONNECTING...</b>';
+                clientConn.on('error', (err) => {
+                    console.error('Connection error:', err);
+                    document.getElementById('error-message').innerText = 'Could not connect to room. Check the room code and try again.';
+                    showClientState('share-error');
+                });
 
-                stream.getVideoTracks()[0].onended = () => {
-                    console.log('Screen share ended');
-                    location.reload();
+            } catch (e) {
+                console.error('Error:', e);
+                document.getElementById('error-message').innerText = e.message;
+                showClientState('share-error');
+            }
+        }
+
+        async function shareScreen() {
+            try {
+                currentStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const call = peer.call(roomId, currentStream);
+
+                showClientState('share-live');
+
+                currentStream.getVideoTracks()[0].onended = () => {
+                    currentStream = null;
+                    showClientState('share-ended');
                 };
             } catch (e) {
-                console.error('Screen share error:', e);
-                alert("Error: " + e.message);
+                // User cancelled screen selection - show approved state again
+                if (e.name === 'NotAllowedError') {
+                    showClientState('share-approved');
+                } else {
+                    document.getElementById('error-message').innerText = e.message;
+                    showClientState('share-error');
+                }
             }
+        }
+
+        function stopSharing() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            showClientState('share-ended');
         }
     </script>
 </body>
