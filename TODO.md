@@ -25,14 +25,17 @@ This document tracks recommended improvements for the QuickShare Room Hub applic
 
 - [ ] **Rate limiting** - Add express-rate-limit to prevent abuse
 - [ ] **Configurable trust proxy** - Make `app.set('trust proxy')` configurable via environment variable
-- [ ] **Input validation** - Validate room codes server-side before PeerJS connection
+- [x] **Input validation** - Validate room codes client-side and sanitize user-controlled data
+- [x] **Security headers** - Added X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
 - [ ] **CSP headers** - Add Content Security Policy headers
 - [ ] **CORS configuration** - Configure CORS if needed for API access
+- [x] **XSS prevention** - Added escapeHtml utility, sanitize all user data in innerHTML
+- [x] **Pin CDN versions** - Pinned lucide to specific version (was @latest)
 
 ## Medium Priority - Reliability
 
 - [ ] **WebRTC reconnection** - Implement automatic reconnection on ICE failures
-- [ ] **PeerJS connection retry** - Add exponential backoff for failed peer connections
+- [x] **PeerJS connection retry** - Added exponential backoff with max 5 reconnect attempts
 - [ ] **Graceful degradation** - Handle scenarios where WebRTC is not supported
 - [ ] **Connection state monitoring** - Display connection quality indicators
 - [ ] **Heartbeat mechanism** - Detect and handle stale connections
@@ -72,6 +75,20 @@ This document tracks recommended improvements for the QuickShare Room Hub applic
 ## Known Issues
 
 - None currently tracked
+
+## Recently Fixed
+
+- [x] **XSS vulnerability** - User-controlled peer names were inserted into innerHTML without escaping
+- [x] **Peer open race condition** - initHost() could miss the peer.on('open') event if peer connected before handler registered
+- [x] **Infinite reconnect loop** - peer.on('disconnected') blindly called reconnect() with no limit or backoff
+- [x] **peer-unavailable error mishandled** - PeerJS fires this on Peer object, not connection; added global handler
+- [x] **Memory leaks** - Stream tracks not stopped on call close; call objects leaked in shareScreen()
+- [x] **No page unload cleanup** - Streams, calls, and peer connections not cleaned up on beforeunload
+- [x] **CDN supply chain risk** - lucide loaded with @latest tag; pinned to specific version
+- [x] **Server middleware order** - server.listen() called before middleware registered; imports scattered
+- [x] **No server error handling** - Added EADDRINUSE handling and graceful SIGTERM/SIGINT shutdown
+- [x] **No security headers** - Added X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+- [x] **Missing accessibility** - Added focus-visible styles for buttons and focus styles for inputs
 
 ## Completed
 

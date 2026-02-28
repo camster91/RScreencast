@@ -7,7 +7,7 @@
     <title>QuickShare Room Hub</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.575.0"></script>
     <style>
         :root {
             --bg: #0f172a;
@@ -127,6 +127,7 @@
         }
 
         .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+        .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
         .btn-secondary { background: var(--input-bg); }
@@ -144,6 +145,12 @@
             font-size: 1.5rem;
             text-align: center;
             text-transform: uppercase;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
         }
 
         /* Peer Panel - Hidden by default */
@@ -521,6 +528,21 @@
         const roomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
 
+        // Validate room code format - only allow alphanumeric, max 10 chars
+        if (roomId && !/^[A-Za-z0-9]{1,10}$/.test(roomId)) {
+            window.location.search = '?mode=join';
+        }
+
+        // Escape HTML to prevent XSS when inserting user-controlled data
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         // Room state
         let connectedPeers = new Map(); // peerId -> { conn, call, stream, name, approved }
         let currentViewingPeer = null;
@@ -553,9 +575,35 @@
             }
         });
 
-        peer.on('open', (id) => console.log('Connected with ID:', id));
-        peer.on('error', (err) => console.error('Peer error:', err));
-        peer.on('disconnected', () => peer.reconnect());
+        // Reconnection with exponential backoff
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+
+        peer.on('open', (id) => {
+            reconnectAttempts = 0;
+            console.log('Connected with ID:', id);
+        });
+
+        peer.on('error', (err) => {
+            console.error('Peer error:', err);
+            // Handle peer-unavailable globally (PeerJS fires this on the Peer object, not the connection)
+            if (err.type === 'peer-unavailable' && roomId) {
+                document.getElementById('error-message').innerText =
+                    'Room "' + escapeHtml(roomId.toUpperCase()) + '" not found. Check the code and try again.';
+                showClientState('share-error');
+            }
+        });
+
+        peer.on('disconnected', () => {
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = 1000 * reconnectAttempts;
+                console.log(`Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${delay}ms...`);
+                setTimeout(() => peer.reconnect(), delay);
+            } else {
+                console.error('Max reconnection attempts reached');
+            }
+        });
 
         // Route to correct view
         if (roomId) {
@@ -618,13 +666,23 @@
 
         // ========== HOST FUNCTIONS ==========
         function initHost() {
-            peer.on('open', (id) => {
+            function setupHostDisplay(id) {
                 document.getElementById('id-display').innerText = id;
                 const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
-                document.getElementById('url-helper').innerHTML = `Go to <strong>${window.location.host}</strong> and enter code`;
-                new QRCode(document.getElementById("qrcode"), { text: joinUrl, width: 180, height: 180 });
+                document.getElementById('url-helper').innerHTML = `Go to <strong>${escapeHtml(window.location.host)}</strong> and enter code`;
+                // Only create QR code if not already created
+                const qrEl = document.getElementById("qrcode");
+                if (!qrEl.hasChildNodes()) {
+                    new QRCode(qrEl, { text: joinUrl, width: 180, height: 180 });
+                }
                 lucide.createIcons();
-            });
+            }
+
+            // Handle case where peer is already open (race condition fix)
+            if (peer.open) {
+                setupHostDisplay(peer.id);
+            }
+            peer.on('open', setupHostDisplay);
 
             // Handle data connections (for approval)
             peer.on('connection', (conn) => {
@@ -665,6 +723,10 @@
                         stopViewing();
                     }
                     if (peerData) {
+                        // Stop all tracks to release media resources
+                        if (peerData.stream) {
+                            peerData.stream.getTracks().forEach(track => track.stop());
+                        }
                         peerData.stream = null;
                         peerData.call = null;
                     }
@@ -763,16 +825,19 @@
                     statusText = isActive ? '● Currently viewing' : 'Click to view screen';
                 }
 
+                const safePeerId = escapeHtml(peerId);
+                const safeName = escapeHtml(data.name);
+
                 html += `
                     <div class="peer-item ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}"
-                         onclick="${hasStream ? `viewPeer('${peerId}')` : ''}"
+                         onclick="${hasStream ? `viewPeer('${safePeerId}')` : ''}"
                          style="${hasStream && !isActive ? 'cursor: pointer;' : ''}">
                         <div class="peer-info">
-                            <div class="peer-name">${data.name}</div>
+                            <div class="peer-name">${safeName}</div>
                             <div class="peer-status">${statusText}</div>
                         </div>
                         <div class="peer-actions">
-                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); kickPeer('${peerId}')" title="Remove">
+                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); kickPeer('${safePeerId}')" title="Remove">
                                 <i data-lucide="x" style="width:14px;height:14px;"></i>
                             </button>
                         </div>
@@ -877,6 +942,7 @@
 
         // ========== CLIENT FUNCTIONS ==========
         let currentStream = null;
+        let currentCall = null;
         let clientConn = null;
 
         function showClientState(state) {
@@ -979,12 +1045,16 @@
         async function shareScreen() {
             try {
                 currentStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                const call = peer.call(roomId, currentStream);
+                currentCall = peer.call(roomId, currentStream);
 
                 showClientState('share-live');
 
                 currentStream.getVideoTracks()[0].onended = () => {
                     currentStream = null;
+                    if (currentCall) {
+                        currentCall.close();
+                        currentCall = null;
+                    }
                     showClientState('share-ended');
                 };
             } catch (e) {
@@ -1003,8 +1073,30 @@
                 currentStream.getTracks().forEach(track => track.stop());
                 currentStream = null;
             }
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
             showClientState('share-ended');
         }
+        // Clean up resources when page unloads
+        window.addEventListener('beforeunload', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            if (currentCall) {
+                currentCall.close();
+            }
+            // Close all host connections
+            connectedPeers.forEach((data) => {
+                if (data.stream) {
+                    data.stream.getTracks().forEach(track => track.stop());
+                }
+                if (data.call) data.call.close();
+                if (data.conn) data.conn.close();
+            });
+            peer.destroy();
+        });
     </script>
 </body>
 
