@@ -1,6 +1,6 @@
-# QuickShare Room Hub
+# Rotman Meeting Rooms - QuickShare Hub
 
-A simple PIN-based screen sharing system using WebRTC.
+A simple PIN-based screen sharing system using WebRTC for meeting rooms and collaboration spaces. Enables easy screen sharing between room displays and participant devices.
 
 ## Quick Start
 
