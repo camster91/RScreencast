@@ -24,6 +24,9 @@
         </div>
 
         <div class="floating-controls" id="floating-controls">
+<button class="btn btn-secondary btn-small lock-room-btn" data-action="toggle-room-lock" title="Stop new join requests">
+                    <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
+                </button>
             <button class="btn btn-secondary btn-small" data-action="toggle-peer-panel" id="participants-btn" style="position: relative;">
                 <i data-lucide="users"></i> Participants
                 <span class="notification-badge" id="pending-badge" style="display: none;">0</span>
@@ -48,6 +51,9 @@
                 </div>
                 <button class="btn" id="unmute-btn" data-action="unmute" style="display: none;">
                     <i data-lucide="volume-x"></i> Tap for sound
+                </button>
+<button class="btn btn-secondary lock-room-btn" data-action="toggle-room-lock" title="Stop new join requests">
+                    <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
                 </button>
                 <button class="btn btn-secondary" id="switch-presenter-btn" data-action="toggle-peer-panel" style="display: none;">
                     <i data-lucide="users"></i> Switch
@@ -102,6 +108,8 @@
                     <h4><i data-lucide="clock" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;"></i> Waiting for Host</h4>
                     <p>The host needs to approve your request before you can share.</p>
                 </div>
+                <p class="your-code">Your code: <strong id="my-presenter-code">----</strong>
+                    <span>The host may ask you for it.</span></p>
             </div>
 
             <div id="share-approved" style="display: none;">
@@ -137,7 +145,7 @@
             <div id="share-denied" style="display: none;">
                 <i data-lucide="x-circle" style="width:48px; height:48px; color:var(--danger); margin-bottom:1rem;"></i>
                 <h2>Request Denied</h2>
-                <p style="color:var(--text-dim); margin-bottom:1.5rem;">The host did not allow you to join this session.</p>
+                <p id="denied-message" style="color:var(--text-dim); margin-bottom:1.5rem;">The host did not allow you to join this session.</p>
                 <button class="btn btn-secondary btn-full" data-action="reload">
                     <i data-lucide="refresh-cw"></i> Try Again
                 </button>
@@ -169,6 +177,8 @@
         <div class="modal">
             <h3>New Presenter Request</h3>
             <p><strong id="requester-name">Someone</strong> wants to share their screen</p>
+            <p class="code-check">Ask them to confirm this code is on their screen:
+                <strong id="requester-code">----</strong></p>
             <div class="modal-buttons">
                 <button class="btn btn-danger" data-action="deny">Deny</button>
                 <button class="btn" data-action="approve">Allow</button>
