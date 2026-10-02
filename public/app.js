@@ -28,6 +28,7 @@ let connectedPeers = new Map(); // peerId -> { conn, call, stream, name, approve
 let currentViewingPeer = null;
 let pendingApprovals = [];
 let modalPeerId = null; // peer whose request is shown in the approval modal
+let roomLocked = false; // host turned off new join requests
 const MAX_PENDING_APPROVALS = 10;
 
 // Generate a short 5-character room code
@@ -441,6 +442,11 @@ function handlePeerMessage(conn, data) {
             return;
         }
 
+        if (roomLocked) {
+            sendThenClose(conn, { type: 'denied', reason: 'locked' });
+            return;
+        }
+
         if (pendingApprovals.length >= MAX_PENDING_APPROVALS) {
             sendThenClose(conn, { type: 'denied' });
             return;
@@ -468,8 +474,36 @@ function handlePeerMessage(conn, data) {
     }
 }
 
+// Short code derived from a presenter's peer ID. The presenter sees it on
+// their screen and the host sees it in the request, so the host can check
+// the request really comes from the person in the room.
+function presenterCode(peerId) {
+    return String(peerId).replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
+}
+
 function presenterName(peerId) {
-    return 'Presenter ' + String(peerId).replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
+    return 'Presenter ' + presenterCode(peerId);
+}
+
+function toggleRoomLock() {
+    roomLocked = !roomLocked;
+    // Locking also turns away anyone still waiting
+    if (roomLocked) {
+        for (const peerId of [...pendingApprovals]) {
+            const peerData = connectedPeers.get(peerId);
+            connectedPeers.delete(peerId);
+            removePendingApproval(peerId);
+            if (peerData) sendThenClose(peerData.conn, { type: 'denied', reason: 'locked' });
+        }
+        updatePeerList();
+    }
+    document.querySelectorAll('.lock-room-btn').forEach((btn) => {
+        btn.classList.toggle('locked', roomLocked);
+        btn.innerHTML = roomLocked
+            ? '<i data-lucide="lock"></i> <span class="lock-label">Room locked</span>'
+            : '<i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>';
+    });
+    renderIcons();
 }
 
 function showNextApproval() {
@@ -481,6 +515,7 @@ function showNextApproval() {
     if (peerData) {
         modalPeerId = peerId;
         document.getElementById('requester-name').innerText = peerData.name;
+        document.getElementById('requester-code').innerText = presenterCode(peerId);
         document.getElementById('approval-modal').classList.add('active');
     }
 }
@@ -787,6 +822,7 @@ async function startSharing() {
         return;
     }
 
+    document.getElementById('my-presenter-code').innerText = presenterCode(peer.id);
     showClientState('share-waiting');
 
     // First establish data connection
@@ -818,6 +854,10 @@ async function startSharing() {
         } else if (data.type === 'denied') {
             clientDone = true;
             endShare(false);
+            if (data.reason === 'locked') {
+                document.getElementById('denied-message').innerText =
+                    'This room is locked. Ask the host to unlock it.';
+            }
             showClientState('share-denied');
         } else if (data.type === 'kicked') {
             clientDone = true;
@@ -952,7 +992,8 @@ const ACTIONS = {
     'stop-sharing': stopSharing,
     'reload': () => window.location.reload(),
     'approve': () => handleApproval(true),
-    'deny': () => handleApproval(false)
+    'deny': () => handleApproval(false),
+    'toggle-room-lock': toggleRoomLock
 };
 
 document.addEventListener('click', (event) => {

@@ -12,7 +12,7 @@ import iconsJs from '../public/icons.js';
 import peerJs from '../public/vendor/peerjs.min.js';
 import qrcodeJs from '../public/vendor/qrcode.min.js';
 import { getTurnServers } from '../turn.js';
-import { SECURITY_HEADERS } from '../headers.js';
+import { SECURITY_HEADERS, isCrossSiteRequest } from '../headers.js';
 
 const PEERJS_KEY = 'peerjs';
 // Same ID rule as the PeerJS client
@@ -81,6 +81,9 @@ export default {
         }
 
         if (path === '/config') {
+            if (isCrossSiteRequest(name => request.headers.get(name))) {
+                return json({ error: 'Forbidden' }, { status: 403 });
+            }
             return json({
                 peerServer: 'self',
                 iceServers: await getTurnServers(env),

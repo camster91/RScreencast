@@ -9,9 +9,11 @@
 //    TURN_USERNAME, TURN_CREDENTIAL. These are visible to every visitor.
 
 const CLOUDFLARE_API = 'https://rtc.live.cloudflare.com/v1/turn/keys';
-const CREDENTIAL_TTL_SECONDS = 24 * 60 * 60;
-// Hand out cached credentials while they have at least this long left
-const MIN_REMAINING_MS = 12 * 60 * 60 * 1000;
+// Short-lived, so leaked credentials stop working soon. The page fetches
+// fresh ones every hour, and every set handed out has at least 4 hours left
+// (long enough for any presentation).
+const CREDENTIAL_TTL_SECONDS = 6 * 60 * 60;
+const MIN_REMAINING_MS = 4 * 60 * 60 * 1000;
 
 let cached = null; // { iceServers, expiresAt }
 let pending = null;

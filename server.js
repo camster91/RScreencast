@@ -3,7 +3,7 @@ const http = require('http');
 const { ExpressPeerServer } = require('peer');
 const path = require('path');
 const { getTurnServers } = require('./turn');
-const { SECURITY_HEADERS } = require('./headers');
+const { SECURITY_HEADERS, isCrossSiteRequest } = require('./headers');
 
 const app = express();
 
@@ -31,6 +31,9 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 // Client settings: which signaling server to use and extra ICE servers
 app.get('/config', async (req, res) => {
     res.set('Cache-Control', 'no-store');
+    if (isCrossSiteRequest(name => req.get(name))) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
     res.json({
         peerServer: process.env.PEER_SERVER === 'self' ? 'self' : 'cloud',
         iceServers: await getTurnServers(),

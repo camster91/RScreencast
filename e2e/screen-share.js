@@ -126,9 +126,13 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
 
     const presenter = await newPresenter(code.toLowerCase());
 
-    await t.test('lowercase link works and host can approve', async () => {
+    await t.test('lowercase link works, codes match, and host can approve', async () => {
         await presenter.click('#join-btn');
-        await approveNext(host);
+        await host.waitForSelector('#approval-modal.active', { timeout: 15000 });
+        const shown = await presenter.locator('#my-presenter-code').innerText();
+        assert.match(shown, /^[A-Z0-9]{4}$/);
+        assert.strictEqual(await host.locator('#requester-code').innerText(), shown);
+        await host.click('[data-action="approve"]');
         await presenter.waitForSelector('#share-approved', { state: 'visible', timeout: 10000 });
     });
 
@@ -188,6 +192,26 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         await host.click('[data-action="deny"]');
         await p.waitForSelector('#share-denied', { state: 'visible', timeout: 5000 });
         await p.context().close();
+    });
+
+    await t.test('locked room turns presenters away', async () => {
+        await host.click('#floating-controls [data-action="toggle-room-lock"]');
+        assert.match(await host.locator('#floating-controls .lock-room-btn').innerText(), /Room locked/);
+        const p = await newPresenter(code);
+        await p.click('#join-btn');
+        await p.waitForSelector('#share-denied', { state: 'visible', timeout: 10000 });
+        assert.match(await p.locator('#denied-message').innerText(), /locked/);
+        await p.context().close();
+        await host.click('#floating-controls [data-action="toggle-room-lock"]');
+        assert.match(await host.locator('#floating-controls .lock-room-btn').innerText(), /Lock room/);
+    });
+
+    await t.test('security headers are sent', async () => {
+        const res = await fetch(`${BASE}/`);
+        assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);
+        assert.match(res.headers.get('permissions-policy') || '', /display-capture=\(self\)/);
+        const crossSite = await fetch(`${BASE}/config`, { headers: { 'Sec-Fetch-Site': 'cross-site' } });
+        assert.strictEqual(crossSite.status, 403);
     });
 
     await t.test('removed presenter is told', async () => {

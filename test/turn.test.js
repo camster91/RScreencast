@@ -69,7 +69,7 @@ test('Cloudflare credentials are requested, port 53 URLs dropped, and cached', a
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].url, 'https://rtc.live.cloudflare.com/v1/turn/keys/key123/credentials/generate-ice-servers');
     assert.strictEqual(calls[0].options.headers.Authorization, 'Bearer secret');
-    assert.deepStrictEqual(JSON.parse(calls[0].options.body), { ttl: 86400 });
+    assert.deepStrictEqual(JSON.parse(calls[0].options.body), { ttl: 21600 });
 
     // Second call uses the cache
     await getTurnServers(CF_ENV);

@@ -344,3 +344,22 @@ input:focus {
 }
 
 .button-group .btn { flex: 1; }
+
+/* Presenter code check */
+.code-check { font-size: 0.9rem; }
+.code-check strong, .your-code strong {
+    font-family: monospace;
+    letter-spacing: 2px;
+    color: var(--text);
+}
+.your-code {
+    margin-top: 1rem;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+}
+.your-code strong { font-size: 1.4rem; display: block; margin: 0.25rem 0; }
+.your-code span { font-size: 0.8rem; }
+
+/* Room lock */
+.lock-room-btn.locked { background: var(--danger); }
+.lock-room-btn.locked:hover { background: #dc2626; }

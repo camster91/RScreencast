@@ -118,6 +118,21 @@ to this app and the other Rotman AV apps.
 
 `server.js` still works for local development and Docker (`npm start`).
 
+## Security
+
+- **Host approval:** presenters can only share after the room PC clicks Allow.
+- **Code check:** each presenter's screen shows a 4-character code; the approval prompt
+  shows the same code, so the host can confirm who is asking. Names can't be chosen by presenters.
+- **Lock room:** the host can stop new join requests (and turn away anyone waiting).
+- **Encryption:** video goes peer-to-peer over WebRTC (DTLS-SRTP); the TURN relay only forwards
+  encrypted packets. The site is HTTPS-only (HSTS, TLS 1.2+).
+- **Browser hardening:** strict Content Security Policy (scripts only from this site),
+  Permissions-Policy (screen capture only; no camera, microphone or location), no framing.
+- **Abuse limits:** Cloudflare rate limit of 60 requests per 10 seconds per IP; the signaling
+  server closes connections that send over 300 messages per 10 seconds or messages over 64 KB.
+- **TURN credentials:** short-lived (6 hours), and `/config` refuses requests other
+  websites make through a visitor's browser.
+
 ## Project Layout
 
 | Path | What it is |
