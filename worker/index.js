@@ -5,8 +5,14 @@
 //   It speaks the same protocol as the `peer` npm package used by server.js.
 
 import { DurableObject } from 'cloudflare:workers';
-import html from '../public/index.html';
+import indexHtml from '../public/index.html';
+import appCss from '../public/app.css';
+import appJs from '../public/app.js';
+import iconsJs from '../public/icons.js';
+import peerJs from '../public/vendor/peerjs.min.js';
+import qrcodeJs from '../public/vendor/qrcode.min.js';
 import { getTurnServers } from '../turn.js';
+import { SECURITY_HEADERS } from '../headers.js';
 
 const PEERJS_KEY = 'peerjs';
 // Same ID rule as the PeerJS client
@@ -15,10 +21,16 @@ const VALID_ID = /^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/;
 const RELAYED_TYPES = new Set(['OFFER', 'ANSWER', 'CANDIDATE', 'LEAVE']);
 const HEARTBEAT = JSON.stringify({ type: 'HEARTBEAT' });
 
-const SECURITY_HEADERS = {
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'SAMEORIGIN',
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
+// Files from public/, bundled into the Worker as text
+const JS = 'text/javascript; charset=utf-8';
+const STATIC_FILES = {
+    '/': { body: indexHtml, type: 'text/html; charset=utf-8' },
+    '/index.html': { body: indexHtml, type: 'text/html; charset=utf-8' },
+    '/app.css': { body: appCss, type: 'text/css; charset=utf-8' },
+    '/app.js': { body: appJs, type: JS },
+    '/icons.js': { body: iconsJs, type: JS },
+    '/vendor/peerjs.min.js': { body: peerJs, type: JS, cache: 'public, max-age=86400' },
+    '/vendor/qrcode.min.js': { body: qrcodeJs, type: JS, cache: 'public, max-age=86400' }
 };
 
 function json(data, init = {}) {
@@ -48,9 +60,10 @@ export default {
             return Response.redirect(env.CANONICAL_URL + url.search, 301);
         }
 
-        if (path === '/' || path === '/index.html') {
-            return new Response(html, {
-                headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...SECURITY_HEADERS }
+        const file = STATIC_FILES[path];
+        if (file) {
+            return new Response(file.body, {
+                headers: { 'Content-Type': file.type, 'Cache-Control': file.cache || 'no-cache', ...SECURITY_HEADERS }
             });
         }
 

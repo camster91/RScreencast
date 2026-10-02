@@ -3,8 +3,10 @@ const http = require('http');
 const { ExpressPeerServer } = require('peer');
 const path = require('path');
 const { getTurnServers } = require('./turn');
+const { SECURITY_HEADERS } = require('./headers');
 
 const app = express();
+
 const port = process.env.PORT || 3000;
 
 // Enable trust proxy for Nginx/reverse proxy environments
@@ -12,10 +14,7 @@ app.set('trust proxy', true);
 
 // Security headers
 app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.set(SECURITY_HEADERS);
     next();
 });
 

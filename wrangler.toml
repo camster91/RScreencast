@@ -12,8 +12,8 @@ routes = [
 ]
 workers_dev = true
 
-# Serve public/index.html from the Worker
-rules = [{ type = "Text", globs = ["**/*.html"], fallthrough = false }]
+# Bundle the files in public/ into the Worker as text
+rules = [{ type = "Text", globs = ["**/*.html", "**/*.css", "**/public/*.js", "**/public/**/*.js"], fallthrough = false }]
 
 [[durable_objects.bindings]]
 name = "SIGNALING"
