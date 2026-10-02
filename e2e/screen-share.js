@@ -170,10 +170,21 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         assert.ok(await host.locator('#room-pc-setup').isVisible());
     });
 
-    await t.test('denied presenter is told', async () => {
+    await t.test('denied presenter is told, and cannot choose their own name', async () => {
         const p = await newPresenter(code);
+        // A modified client tries to pose as someone trustworthy
+        await p.evaluate(() => {
+            const realConnect = peer.connect.bind(peer);
+            peer.connect = (...args) => {
+                const conn = realConnect(...args);
+                const realSend = conn.send.bind(conn);
+                conn.send = (data) => realSend(data && data.type === 'join-request' ? { ...data, name: 'IT Support' } : data);
+                return conn;
+            };
+        });
         await p.click('#join-btn');
         await host.waitForSelector('#approval-modal.active', { timeout: 15000 });
+        assert.match(await host.locator('#requester-name').innerText(), /^Presenter [A-Z0-9]{4}$/);
         await host.click('[data-action="deny"]');
         await p.waitForSelector('#share-denied', { state: 'visible', timeout: 5000 });
         await p.context().close();

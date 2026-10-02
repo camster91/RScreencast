@@ -20,6 +20,11 @@ const VALID_ID = /^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/;
 // Message types relayed from one peer to another
 const RELAYED_TYPES = new Set(['OFFER', 'ANSWER', 'CANDIDATE', 'LEAVE']);
 const HEARTBEAT = JSON.stringify({ type: 'HEARTBEAT' });
+// Abuse limits per connection. Normal signaling (an offer, an answer and a few
+// dozen ICE candidates per call) stays far below these.
+const MAX_MESSAGE_BYTES = 64 * 1024;
+const RATE_WINDOW_MS = 10 * 1000;
+const MAX_MESSAGES_PER_WINDOW = 300;
 
 // Files from public/, bundled into the Worker as text
 const JS = 'text/javascript; charset=utf-8';
@@ -151,7 +156,29 @@ export class SignalingServer extends DurableObject {
         return new Response(null, { status: 101, webSocket: client });
     }
 
+    // True if this connection sent too much; the connection is then closed
+    overLimit(ws, raw) {
+        if (typeof raw !== 'string' || raw.length > MAX_MESSAGE_BYTES) {
+            ws.close(1009, 'Message too large');
+            return true;
+        }
+        this.rates = this.rates || new WeakMap();
+        const now = Date.now();
+        let rate = this.rates.get(ws);
+        if (!rate || now - rate.start > RATE_WINDOW_MS) {
+            rate = { start: now, count: 0 };
+            this.rates.set(ws, rate);
+        }
+        if (++rate.count > MAX_MESSAGES_PER_WINDOW) {
+            ws.close(1008, 'Too many messages');
+            return true;
+        }
+        return false;
+    }
+
     async webSocketMessage(ws, raw) {
+        if (this.overLimit(ws, raw)) return;
+
         let message;
         try {
             message = JSON.parse(raw);

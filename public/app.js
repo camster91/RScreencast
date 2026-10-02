@@ -446,10 +446,11 @@ function handlePeerMessage(conn, data) {
             return;
         }
 
-        // Add to connected peers as pending
+        // Add to connected peers as pending. The name comes from the peer ID,
+        // not from the request, so a presenter can't pose as "IT Support".
         connectedPeers.set(conn.peer, {
             conn: conn,
-            name: String(data.name || 'Presenter').slice(0, 40),
+            name: presenterName(conn.peer),
             approved: false,
             stream: null,
             call: null
@@ -465,6 +466,10 @@ function handlePeerMessage(conn, data) {
             endCall(conn.peer, existing.call);
         }
     }
+}
+
+function presenterName(peerId) {
+    return 'Presenter ' + String(peerId).replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
 }
 
 function showNextApproval() {
@@ -801,10 +806,7 @@ async function startSharing() {
         clearTimeout(openTimeout);
         // No timeout after this: the host may take a while to click Allow,
         // and 'close' tells us if they leave.
-        conn.send({
-            type: 'join-request',
-            name: 'Presenter ' + peer.id.substring(0, 4).toUpperCase()
-        });
+        conn.send({ type: 'join-request' });
     });
 
     conn.on('data', (data) => {
