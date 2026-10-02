@@ -1,0 +1,19 @@
+name = "quickshare"
+main = "worker/index.js"
+compatibility_date = "2026-09-01"
+account_id = "be5629964da6a37742ab021584b224d8"
+
+# Serve public/index.html from the Worker
+rules = [{ type = "Text", globs = ["**/*.html"], fallthrough = false }]
+
+[[durable_objects.bindings]]
+name = "SIGNALING"
+class_name = "SignalingServer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SignalingServer"]
+
+# Secrets (set with `npx wrangler secret put <NAME>`):
+#   CLOUDFLARE_TURN_KEY_ID
+#   CLOUDFLARE_TURN_API_TOKEN
