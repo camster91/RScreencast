@@ -176,6 +176,8 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
 
     await t.test('denied presenter is told, and cannot choose their own name', async () => {
         const p = await newPresenter(code);
+        // Wait for the page to connect before tampering with its connection
+        await p.waitForFunction(() => typeof peer !== 'undefined' && peer && peer.open, null, { timeout: 15000 });
         // A modified client tries to pose as someone trustworthy
         await p.evaluate(() => {
             const realConnect = peer.connect.bind(peer);
