@@ -94,7 +94,8 @@ HTTPS is required for screen sharing.
 
 The app runs on Cloudflare Workers (account **Cameron Rotman**) at
 **https://rotmanav.ca/cast/** (route `rotmanav.ca/cast*`). https://share.rotmanav.ca redirects
-there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
+there. The workers.dev address is turned off so all traffic goes through the zone's
+rate-limit rule (60 requests per 10 seconds per IP on `/cast` and `share.rotmanav.ca`).
 
 - `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
   Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
@@ -104,18 +105,45 @@ there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
   set on the Worker.
 - Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.
 
-To redeploy after changes:
+Deploys happen automatically: Cloudflare Workers Builds runs `npx wrangler@4 deploy`
+on every push to `main`. To deploy by hand instead:
 
 ```bash
 npx wrangler login     # once
 npx wrangler deploy
 ```
 
+The home page at https://rotmanav.ca/ is a separate Worker (`rotmanav-hub`) that links
+to this app and the other Rotman AV apps.
+
 `server.js` still works for local development and Docker (`npm start`).
+
+## Project Layout
+
+| Path | What it is |
+|---|---|
+| `public/index.html`, `app.css`, `app.js` | The page (room PC and presenter views) |
+| `public/icons.js` | The 19 icons the page uses |
+| `public/vendor/` | PeerJS and QRCode.js, served locally (no CDN) |
+| `worker/index.js` | Cloudflare Worker: serves `public/`, `/config`, and signaling (Durable Object) |
+| `server.js` | Node.js server for local use or Docker |
+| `turn.js`, `headers.js` | Shared by both servers: TURN credentials, security headers |
+
+## Testing
+
+```bash
+npm test          # unit tests (TURN credentials)
+npm run test:e2e  # browser test: room PC + presenters in headless Chromium
+```
+
+The browser test starts `server.js` itself. To test the Worker instead, run
+`npx wrangler dev` and `BASE=http://localhost:8787/cast npm run test:e2e`.
+Both run in CI on every pull request.
 
 ## Technical Stack
 
-- **Frontend**: Vanilla JavaScript, no build process required
-- **Signaling**: PeerJS Cloud, or PeerJS running on Node.js (`PEER_SERVER=self`)
-- **WebRTC**: Direct peer-to-peer connections
+- **Frontend**: Vanilla JavaScript, no build step
+- **Signaling**: Durable Object on Cloudflare, or PeerJS on Node.js (`PEER_SERVER=self`), or PeerJS Cloud
+- **WebRTC**: Direct peer-to-peer connections, Cloudflare TURN relay as fallback
+- **Security**: Strict Content Security Policy (scripts only from this site)
 - **UI**: Lucide icons, QRCode.js for code generation

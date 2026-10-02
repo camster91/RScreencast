@@ -62,6 +62,11 @@ jobs:
             echo "No test script found, skipping."
           fi
 
+      - name: End-to-end browser test
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
       - name: Build (or syntax-check for server-only repos)
         run: |
           if grep -q '"build"' package.json; then

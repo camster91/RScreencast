@@ -4,16 +4,17 @@ compatibility_date = "2026-09-01"
 account_id = "be5629964da6a37742ab021584b224d8"
 
 # Main address: rotmanav.ca/cast/ (rotmanav.ca zone lives in this account).
-# share.rotmanav.ca redirects there; workers.dev stays on as a backup.
+# share.rotmanav.ca redirects there. workers.dev is off: it would bypass the
+# zone's rate-limit rule.
 routes = [
   # Wildcard so /cast?room=CODE (QR links) also matches
   { pattern = "rotmanav.ca/cast*", zone_name = "rotmanav.ca" },
   { pattern = "share.rotmanav.ca", custom_domain = true }
 ]
-workers_dev = true
+workers_dev = false
 
-# Serve public/index.html from the Worker
-rules = [{ type = "Text", globs = ["**/*.html"], fallthrough = false }]
+# Bundle the files in public/ into the Worker as text
+rules = [{ type = "Text", globs = ["**/*.html", "**/*.css", "**/public/*.js", "**/public/**/*.js"], fallthrough = false }]
 
 [[durable_objects.bindings]]
 name = "SIGNALING"
