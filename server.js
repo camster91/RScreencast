@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { ExpressPeerServer } = require('peer');
 const path = require('path');
+const { getTurnServers } = require('./turn');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -28,24 +29,12 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => res.send('OK'));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// TURN relay servers from env (comma-separated URLs). Browsers use these when
-// a direct connection is blocked, e.g. on strict corporate/campus networks.
-function getTurnServers() {
-    const urls = (process.env.TURN_URLS || '').split(',').map(u => u.trim()).filter(Boolean);
-    if (urls.length === 0) return [];
-    return [{
-        urls,
-        username: process.env.TURN_USERNAME || undefined,
-        credential: process.env.TURN_CREDENTIAL || undefined
-    }];
-}
-
 // Client settings: which signaling server to use and extra ICE servers
-app.get('/config', (req, res) => {
+app.get('/config', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({
         peerServer: process.env.PEER_SERVER === 'self' ? 'self' : 'cloud',
-        iceServers: getTurnServers(),
+        iceServers: await getTurnServers(),
         debug: process.env.PEERJS_DEBUG === 'true'
     });
 });

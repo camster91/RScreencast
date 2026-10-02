@@ -54,6 +54,14 @@ jobs:
           fi
         continue-on-error: true
 
+      - name: Test (if configured)
+        run: |
+          if grep -q '"test"' package.json; then
+            npm test
+          else
+            echo "No test script found, skipping."
+          fi
+
       - name: Build (or syntax-check for server-only repos)
         run: |
           if grep -q '"build"' package.json; then
