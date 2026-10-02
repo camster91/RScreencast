@@ -28,25 +28,41 @@ function json(data, init = {}) {
     });
 }
 
+// The app can also be served from a folder, e.g. rotmanav.ca/cast/
+const BASE_PREFIX = '/cast';
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
-        if (url.pathname === '/' || url.pathname === '/index.html') {
+        if (url.pathname === BASE_PREFIX) {
+            return Response.redirect(`${url.origin}${BASE_PREFIX}/${url.search}`, 301);
+        }
+        const path = url.pathname.startsWith(`${BASE_PREFIX}/`)
+            ? url.pathname.slice(BASE_PREFIX.length)
+            : url.pathname;
+
+        // Old addresses (REDIRECT_HOSTS) send visitors to CANONICAL_URL
+        const redirectHosts = (env.REDIRECT_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean);
+        if (env.CANONICAL_URL && redirectHosts.includes(url.hostname) && (path === '/' || path === '/index.html')) {
+            return Response.redirect(env.CANONICAL_URL + url.search, 301);
+        }
+
+        if (path === '/' || path === '/index.html') {
             return new Response(html, {
                 headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...SECURITY_HEADERS }
             });
         }
 
-        if (url.pathname === '/health') {
+        if (path === '/health') {
             return new Response('OK');
         }
 
-        if (url.pathname === '/favicon.ico') {
+        if (path === '/favicon.ico') {
             return new Response(null, { status: 204 });
         }
 
-        if (url.pathname === '/config') {
+        if (path === '/config') {
             return json({
                 peerServer: 'self',
                 iceServers: await getTurnServers(env),
@@ -55,19 +71,19 @@ export default {
         }
 
         // PeerJS client asks for a random ID (presenters)
-        if (url.pathname === `/${PEERJS_KEY}/id`) {
+        if (path === `/${PEERJS_KEY}/id`) {
             return new Response(crypto.randomUUID(), {
                 headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' }
             });
         }
 
         // Peer discovery is turned off, same as the `peer` package default
-        if (url.pathname === `/${PEERJS_KEY}/peers`) {
+        if (path === `/${PEERJS_KEY}/peers`) {
             return new Response('Not Found', { status: 404 });
         }
 
         // PeerJS signaling WebSocket. One Durable Object handles every room.
-        if (url.pathname === '/peerjs') {
+        if (path === '/peerjs') {
             if (request.headers.get('Upgrade') !== 'websocket') {
                 return new Response('Expected WebSocket', { status: 426 });
             }

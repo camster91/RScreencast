@@ -15,7 +15,7 @@ A simple PIN-based screen sharing system using WebRTC for meeting rooms and coll
    ```
 
 3. **Access the app:**
-   - **Room PC (Host)**: Open `https://share.rotmanav.ca` - displays QR code and 5-character room code
+   - **Room PC (Host)**: Open `https://rotmanav.ca/cast/` - displays QR code and 5-character room code
    - **Laptop (Client)**: Scan QR code or enter the code manually
 
 ## How It Works
@@ -93,10 +93,13 @@ HTTPS is required for screen sharing.
 ## Cloudflare Deployment
 
 The app runs on Cloudflare Workers (account **Cameron Rotman**) at
-**https://share.rotmanav.ca** (backup address: https://quickshare.cameron-rotman.workers.dev).
+**https://rotmanav.ca/cast/** (route `rotmanav.ca/cast*`). https://share.rotmanav.ca redirects
+there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
 
 - `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
   Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
+- The page works from any folder: it calls `config` and `peerjs` relative to its own URL,
+  and the Worker strips the `/cast` prefix.
 - TURN secrets `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are already
   set on the Worker.
 - Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.
