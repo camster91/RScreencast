@@ -3,3 +3,4 @@ yarn.lock
 bun.lockb
 .env
 
+.wrangler/

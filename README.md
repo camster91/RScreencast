@@ -92,6 +92,26 @@ The app is configured for `joinmeeting.space`. To deploy:
 2. Restart the Node.js process on your server
 3. Ensure HTTPS is enabled (required for WebRTC)
 
+## Cloudflare Deployment
+
+The app runs on Cloudflare Workers (account **Cameron Rotman**) at
+**https://quickshare.cameron-rotman.workers.dev**.
+
+- `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
+  Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
+- TURN secrets `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are already
+  set on the Worker.
+- Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.
+
+To redeploy after changes:
+
+```bash
+npx wrangler login     # once
+npx wrangler deploy
+```
+
+`server.js` still works for local development and Docker (`npm start`).
+
 ## Technical Stack
 
 - **Frontend**: Vanilla JavaScript, no build process required
