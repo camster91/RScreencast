@@ -15,7 +15,7 @@ A simple PIN-based screen sharing system using WebRTC for meeting rooms and coll
    ```
 
 3. **Access the app:**
-   - **Room PC (Host)**: Open `https://joinmeeting.space` - displays QR code and 5-character room code
+   - **Room PC (Host)**: Open `https://rotmanav.ca/cast/` - displays QR code and 5-character room code
    - **Laptop (Client)**: Scan QR code or enter the code manually
 
 ## How It Works
@@ -85,20 +85,21 @@ The server asks Cloudflare for credentials that expire after 24 hours, so the AP
 - Try refreshing both pages and starting over
 - Ensure WebRTC is not blocked by firewall
 
-## Deployment
+## Self-hosting with Node.js or Docker
 
-The app is configured for `joinmeeting.space`. To deploy:
-1. Push code to your repository
-2. Restart the Node.js process on your server
-3. Ensure HTTPS is enabled (required for WebRTC)
+`server.js` runs the same app anywhere Node.js runs (`npm start`, or the Dockerfile).
+HTTPS is required for screen sharing.
 
 ## Cloudflare Deployment
 
 The app runs on Cloudflare Workers (account **Cameron Rotman**) at
-**https://quickshare.cameron-rotman.workers.dev**.
+**https://rotmanav.ca/cast/** (route `rotmanav.ca/cast*`). https://share.rotmanav.ca redirects
+there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
 
 - `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
   Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
+- The page works from any folder: it calls `config` and `peerjs` relative to its own URL,
+  and the Worker strips the `/cast` prefix.
 - TURN secrets `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are already
   set on the Worker.
 - Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.

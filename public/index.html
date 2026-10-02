@@ -531,6 +531,8 @@
         const params = new URLSearchParams(window.location.search);
         const rawRoomId = params.get('room');
         const isJoinMode = params.get('mode') === 'join';
+        // Folder the app is served from ("/" or e.g. "/cast/"); server URLs are relative to it
+        const BASE_PATH = window.location.pathname.replace(/[^/]*$/, '');
 
         // Validate room code format - only allow alphanumeric, max 10 chars
         if (rawRoomId && !/^[A-Za-z0-9]{1,10}$/.test(rawRoomId)) {
@@ -605,7 +607,7 @@
         // loaded, fall back to PeerJS Cloud with STUN only.
         async function loadConfig() {
             try {
-                const res = await fetch('/config', { cache: 'no-store' });
+                const res = await fetch(BASE_PATH + 'config', { cache: 'no-store' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 return await res.json();
             } catch (e) {
@@ -625,7 +627,7 @@
                 const secure = window.location.protocol === 'https:';
                 options.host = window.location.hostname;
                 options.port = window.location.port ? parseInt(window.location.port, 10) : (secure ? 443 : 80);
-                options.path = '/';
+                options.path = BASE_PATH;
                 options.secure = secure;
             }
             return options;
