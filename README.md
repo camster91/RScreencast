@@ -104,12 +104,16 @@ there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
   set on the Worker.
 - Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.
 
-To redeploy after changes:
+Deploys happen automatically: Cloudflare Workers Builds runs `npx wrangler@4 deploy`
+on every push to `main`. To deploy by hand instead:
 
 ```bash
 npx wrangler login     # once
 npx wrangler deploy
 ```
+
+The home page at https://rotmanav.ca/ is a separate Worker (`rotmanav-hub`) that links
+to this app and the other Rotman AV apps.
 
 `server.js` still works for local development and Docker (`npm start`).
 
