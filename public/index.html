@@ -764,6 +764,17 @@
                 peerOptions = buildPeerOptions(config);
                 createPeer(hostRoomCode);
             });
+            // TURN credentials expire, and a room PC can stay open for days.
+            // New connections pick up the refreshed list.
+            setInterval(refreshIceServers, 60 * 60 * 1000);
+        }
+
+        async function refreshIceServers() {
+            const config = await loadConfig();
+            if (!peerOptions || !Array.isArray(config.iceServers)) return;
+            const iceServers = buildPeerOptions(config).config.iceServers;
+            peerOptions.config.iceServers = iceServers;
+            if (peer && peer.options.config) peer.options.config.iceServers = iceServers;
         }
 
         function showView(id) {

@@ -48,12 +48,28 @@ Set these environment variables (see `.env.example`):
 |---|---|---|
 | `PORT` | `3000` | Port the server listens on |
 | `PEER_SERVER` | `cloud` | `cloud` uses the free PeerJS Cloud server. `self` uses this app's own server (needs WebSocket support from your host/proxy). |
-| `TURN_URLS` | _(empty)_ | Comma-separated TURN relay URLs. Needed on strict networks (corporate, campus) where direct connections fail. |
+| `CLOUDFLARE_TURN_KEY_ID` | _(empty)_ | Cloudflare TURN key ID (recommended TURN setup, see below) |
+| `CLOUDFLARE_TURN_API_TOKEN` | _(empty)_ | Cloudflare TURN key API token. Stays on the server. |
+| `TURN_URLS` | _(empty)_ | Comma-separated TURN relay URLs for any other TURN server. Also used as a fallback if Cloudflare fails. |
 | `TURN_USERNAME` | _(empty)_ | TURN username |
 | `TURN_CREDENTIAL` | _(empty)_ | TURN password |
 | `PEERJS_DEBUG` | `false` | Extra PeerJS logging |
 
-The browser loads these from `/config`. TURN credentials are sent to every visitor, so use a TURN account meant for this (most providers offer restricted or short-lived credentials).
+The browser loads these from `/config` (and refreshes them every hour).
+
+### TURN relay (for strict networks)
+
+A TURN relay passes the video through a server when two devices can't connect directly, which is common on corporate and campus networks.
+
+**Cloudflare TURN (recommended)** - the first 1,000 GB a month is free, then $0.05/GB.
+1. In the Cloudflare dashboard, go to **Realtime > TURN Server** and create a TURN key.
+2. Copy the **Key ID** and **API token**.
+3. Set `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` on the server and restart it.
+4. Check `https://<your-site>/config` - `iceServers` should list `turn.cloudflare.com`.
+
+The server asks Cloudflare for credentials that expire after 24 hours, so the API token is never sent to browsers. If Cloudflare can't be reached, the app falls back to `TURN_URLS` (if set) or works without a relay.
+
+**Other TURN servers** - set `TURN_URLS`, `TURN_USERNAME` and `TURN_CREDENTIAL`. These fixed credentials are sent to every visitor.
 
 ## Troubleshooting
 
