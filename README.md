@@ -94,7 +94,8 @@ HTTPS is required for screen sharing.
 
 The app runs on Cloudflare Workers (account **Cameron Rotman**) at
 **https://rotmanav.ca/cast/** (route `rotmanav.ca/cast*`). https://share.rotmanav.ca redirects
-there, and https://quickshare.cameron-rotman.workers.dev stays on as a backup.
+there. The workers.dev address is turned off so all traffic goes through the zone's
+rate-limit rule (60 requests per 10 seconds per IP on `/cast` and `share.rotmanav.ca`).
 
 - `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
   Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
