@@ -15,7 +15,7 @@ A simple PIN-based screen sharing system using WebRTC for meeting rooms and coll
    ```
 
 3. **Access the app:**
-   - **Room PC (Host)**: Open `https://joinmeeting.space` - displays QR code and 5-character room code
+   - **Room PC (Host)**: Open `https://share.rotmanav.ca` - displays QR code and 5-character room code
    - **Laptop (Client)**: Scan QR code or enter the code manually
 
 ## How It Works
@@ -85,17 +85,15 @@ The server asks Cloudflare for credentials that expire after 24 hours, so the AP
 - Try refreshing both pages and starting over
 - Ensure WebRTC is not blocked by firewall
 
-## Deployment
+## Self-hosting with Node.js or Docker
 
-The app is configured for `joinmeeting.space`. To deploy:
-1. Push code to your repository
-2. Restart the Node.js process on your server
-3. Ensure HTTPS is enabled (required for WebRTC)
+`server.js` runs the same app anywhere Node.js runs (`npm start`, or the Dockerfile).
+HTTPS is required for screen sharing.
 
 ## Cloudflare Deployment
 
 The app runs on Cloudflare Workers (account **Cameron Rotman**) at
-**https://quickshare.cameron-rotman.workers.dev**.
+**https://share.rotmanav.ca** (backup address: https://quickshare.cameron-rotman.workers.dev).
 
 - `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
   Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.

@@ -3,6 +3,10 @@ main = "worker/index.js"
 compatibility_date = "2026-09-01"
 account_id = "be5629964da6a37742ab021584b224d8"
 
+# Main address (rotmanav.ca zone lives in this account). workers.dev stays on as a backup.
+routes = [{ pattern = "share.rotmanav.ca", custom_domain = true }]
+workers_dev = true
+
 # Serve public/index.html from the Worker
 rules = [{ type = "Text", globs = ["**/*.html"], fallthrough = false }]
 
