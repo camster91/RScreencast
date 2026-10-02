@@ -28,6 +28,28 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => res.send('OK'));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// TURN relay servers from env (comma-separated URLs). Browsers use these when
+// a direct connection is blocked, e.g. on strict corporate/campus networks.
+function getTurnServers() {
+    const urls = (process.env.TURN_URLS || '').split(',').map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) return [];
+    return [{
+        urls,
+        username: process.env.TURN_USERNAME || undefined,
+        credential: process.env.TURN_CREDENTIAL || undefined
+    }];
+}
+
+// Client settings: which signaling server to use and extra ICE servers
+app.get('/config', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+        peerServer: process.env.PEER_SERVER === 'self' ? 'self' : 'cloud',
+        iceServers: getTurnServers(),
+        debug: process.env.PEERJS_DEBUG === 'true'
+    });
+});
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -35,9 +57,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
 // Initialize the PeerServer
-// Note: Client uses PeerJS Cloud by default; this server handles self-hosted signaling
+// Used by the client when PEER_SERVER=self (needs WebSocket support from the host/proxy).
+// Otherwise the client uses PeerJS Cloud.
 const peerServer = ExpressPeerServer(server, {
-    debug: process.env.NODE_ENV !== 'production',
+    debug: process.env.PEERJS_DEBUG === 'true',
     path: '/',
     proxied: true
 });
