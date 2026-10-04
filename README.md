@@ -1,164 +1,82 @@
-# Rotman Meeting Rooms - QuickShare Hub
+# Rscreencast (QuickShare)
 
-A simple PIN-based screen sharing system using WebRTC for meeting rooms and collaboration spaces. Enables easy screen sharing between room displays and participant devices.
+Browser-based wireless screen sharing for meeting rooms: the room PC shows a QR code and a 5-character code, and presenters share their laptop screen to the room display over WebRTC. No app install, no cables.
 
-## Quick Start
+Built for the Rotman AV team (University of Toronto) as a lightweight alternative to hardware wireless presentation systems.
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## What it does and why
 
-2. **Start the server:**
-   ```bash
-   npm start
-   ```
+Meeting rooms often need a way for guests to put their screen on the room display without installing software or plugging in. QuickShare runs entirely in the browser. The room PC opens the page in host mode; a presenter scans the QR code (or types the code), asks to join, and once the host approves, picks a screen or window to share. Video goes peer-to-peer over WebRTC, with a TURN relay as a fallback for strict corporate and campus networks.
 
-3. **Access the app:**
-   - **Room PC (Host)**: Open `https://rotmanav.ca/cast/` - displays QR code and 5-character room code
-   - **Laptop (Client)**: Scan QR code or enter the code manually
+## Key features
 
-## How It Works
+- **Host mode (room PC)**: generates a 5-character room code that survives reloads, shows a QR code, displays the shared screen full-screen and keeps the display awake (Screen Wake Lock)
+- **Join mode (presenter)**: scan or type the code, request to join, then choose a screen or window with the browser's screen capture picker
+- **Host approval**: presenters can only share after the host clicks Allow. A 4-character check code is shown on both screens so the host can confirm who is asking
+- **Several presenters**: multiple people can join; the host switches between them, removes them, or locks the room to new requests
+- **Self-healing connections**: reconnects on its own when the network or signaling server drops, and cleans up presenters who leave, crash or go offline
+- **Two server options from one codebase**: a Cloudflare Worker with signaling in a Durable Object, or a Node.js/Express server with a PeerJS signaling server (also packaged as a Docker image)
+- **TURN relay support**: Cloudflare TURN with short-lived credentials minted on the server (the API token never reaches the browser), or any TURN server with fixed credentials
+- **Security hardening**: strict Content Security Policy (scripts only from the same origin, libraries vendored locally, no inline handlers), a Permissions-Policy that allows screen capture only, no framing, and message size and rate limits on the signaling server
 
-### Desktop/Room PC (Host Mode)
-- Generates a 5-character room code (kept if the page reloads)
-- Displays QR code for quick joining
-- Approves or denies each presenter, and can remove them
-- Displays the shared screen full-screen; switches between presenters
-- Reconnects on its own if the network or server drops
+## Tech stack
 
-### Laptop/Client (Join Mode)
-- Scan QR code or manually enter the 5-character code
-- Click "Request to Join" and wait for the host to approve
-- Select which screen/window to share
-- Host's display will show your shared screen
+- Vanilla JavaScript, HTML and CSS (no build step)
+- WebRTC via PeerJS, QRCode.js (both vendored in `public/vendor/`)
+- Cloudflare Workers and Durable Objects (`worker/index.js`, `wrangler.toml`)
+- Node.js, Express and the `peer` PeerJS server (`server.js`), Dockerfile
+- Tests: Node's built-in test runner, Playwright (headless Chromium) for the end-to-end test
+- GitHub Actions CI
 
-## Architecture
+## Running locally
 
-**Simple code-based connection:**
-- The host's room code is its PeerJS ID
-- Client enters the code and connects directly via WebRTC
-- Several presenters can join; the host shows one screen at a time
+Requires Node.js 20+. Screen sharing needs HTTPS or `localhost`.
 
-## Configuration
+```bash
+npm install
+cp .env.example .env   # optional: signaling mode and TURN settings
+npm start              # Node.js server on PORT (default 3000)
+```
 
-Set these environment variables (see `.env.example`):
+Open the page on the room PC to get a room code, then open it on a laptop and join with that code.
+
+To run the Cloudflare Worker version locally instead:
+
+```bash
+npx wrangler dev
+```
+
+### Configuration
 
 | Variable | Default | What it does |
 |---|---|---|
-| `PORT` | `3000` | Port the server listens on |
-| `PEER_SERVER` | `cloud` | `cloud` uses the free PeerJS Cloud server. `self` uses this app's own server (needs WebSocket support from your host/proxy). |
-| `CLOUDFLARE_TURN_KEY_ID` | _(empty)_ | Cloudflare TURN key ID (recommended TURN setup, see below) |
-| `CLOUDFLARE_TURN_API_TOKEN` | _(empty)_ | Cloudflare TURN key API token. Stays on the server. |
-| `TURN_URLS` | _(empty)_ | Comma-separated TURN relay URLs for any other TURN server. Also used as a fallback if Cloudflare fails. |
-| `TURN_USERNAME` | _(empty)_ | TURN username |
-| `TURN_CREDENTIAL` | _(empty)_ | TURN password |
+| `PORT` | `3000` | Port for the Node.js server |
+| `PEER_SERVER` | `cloud` | `cloud` uses the public PeerJS Cloud server, `self` uses this app's own signaling server (needs WebSocket support) |
+| `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | empty | Cloudflare TURN key; the server exchanges it for short-lived credentials |
+| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | empty | Any other TURN server (also used as a fallback) |
 | `PEERJS_DEBUG` | `false` | Extra PeerJS logging |
 
-The browser loads these from `/config` (and refreshes them every hour).
-
-### TURN relay (for strict networks)
-
-A TURN relay passes the video through a server when two devices can't connect directly, which is common on corporate and campus networks.
-
-**Cloudflare TURN (recommended)** - the first 1,000 GB a month is free, then $0.05/GB.
-1. In the Cloudflare dashboard, go to **Realtime > TURN Server** and create a TURN key.
-2. Copy the **Key ID** and **API token**.
-3. Set `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` on the server and restart it.
-4. Check `https://<your-site>/config` - `iceServers` should list `turn.cloudflare.com`.
-
-The server asks Cloudflare for credentials that expire after 24 hours, so the API token is never sent to browsers. If Cloudflare can't be reached, the app falls back to `TURN_URLS` (if set) or works without a relay.
-
-**Other TURN servers** - set `TURN_URLS`, `TURN_USERNAME` and `TURN_CREDENTIAL`. These fixed credentials are sent to every visitor.
-
-## Troubleshooting
-
-### Screen not appearing on host display?
-1. Make sure you clicked "Start Screen Share" on the client device
-2. Check browser console (F12) for errors on both devices
-3. Ensure both devices are using HTTPS (required for screen sharing)
-
-### Connection issues?
-- Verify both devices can reach the server
-- Check that the room code matches exactly (5 characters)
-- On corporate or campus networks, set up a TURN relay (see Configuration)
-- Try refreshing both pages and starting over
-- Ensure WebRTC is not blocked by firewall
-
-## Self-hosting with Node.js or Docker
-
-`server.js` runs the same app anywhere Node.js runs (`npm start`, or the Dockerfile).
-HTTPS is required for screen sharing.
-
-## Cloudflare Deployment
-
-The app runs on Cloudflare Workers (account **Cameron Rotman**) at
-**https://rotmanav.ca/cast/** (route `rotmanav.ca/cast*`). https://share.rotmanav.ca redirects
-there. The workers.dev address is turned off so all traffic goes through the zone's
-rate-limit rule (60 requests per 10 seconds per IP on `/cast` and `share.rotmanav.ca`).
-
-- `worker/index.js` serves the page and `/config`, and runs PeerJS signaling in a
-  Durable Object (no PeerJS Cloud needed). It reuses `turn.js` for Cloudflare TURN.
-- The page works from any folder: it calls `config` and `peerjs` relative to its own URL,
-  and the Worker strips the `/cast` prefix.
-- TURN secrets `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are already
-  set on the Worker.
-- Fits the Workers Free plan: heartbeats are answered without waking the Durable Object.
-
-Deploys happen automatically: Cloudflare Workers Builds runs `npx wrangler@4 deploy`
-on every push to `main`. To deploy by hand instead:
-
-```bash
-npx wrangler login     # once
-npx wrangler deploy
-```
-
-The home page at https://rotmanav.ca/ is a separate Worker (`rotmanav-hub`) that links
-to this app and the other Rotman AV apps.
-
-`server.js` still works for local development and Docker (`npm start`).
-
-## Security
-
-- **Host approval:** presenters can only share after the room PC clicks Allow.
-- **Code check:** each presenter's screen shows a 4-character code; the approval prompt
-  shows the same code, so the host can confirm who is asking. Names can't be chosen by presenters.
-- **Lock room:** the host can stop new join requests (and turn away anyone waiting).
-- **Encryption:** video goes peer-to-peer over WebRTC (DTLS-SRTP); the TURN relay only forwards
-  encrypted packets. The site is HTTPS-only (HSTS, TLS 1.2+).
-- **Browser hardening:** strict Content Security Policy (scripts only from this site),
-  Permissions-Policy (screen capture only; no camera, microphone or location), no framing.
-- **Abuse limits:** Cloudflare rate limit of 60 requests per 10 seconds per IP; the signaling
-  server closes connections that send over 300 messages per 10 seconds or messages over 64 KB.
-- **TURN credentials:** short-lived (6 hours), and `/config` refuses requests other
-  websites make through a visitor's browser.
-
-## Project Layout
-
-| Path | What it is |
-|---|---|
-| `public/index.html`, `app.css`, `app.js` | The page (room PC and presenter views) |
-| `public/icons.js` | The 19 icons the page uses |
-| `public/vendor/` | PeerJS and QRCode.js, served locally (no CDN) |
-| `worker/index.js` | Cloudflare Worker: serves `public/`, `/config`, and signaling (Durable Object) |
-| `server.js` | Node.js server for local use or Docker |
-| `turn.js`, `headers.js` | Shared by both servers: TURN credentials, security headers |
+The browser loads its ICE server list from `/config` and refreshes it every hour. To deploy the Worker to your own Cloudflare account, update the account and routes in `wrangler.toml`, set the two TURN secrets with `npx wrangler secret put`, and run `npx wrangler deploy`.
 
 ## Testing
 
 ```bash
-npm test          # unit tests (TURN credentials)
-npm run test:e2e  # browser test: room PC + presenters in headless Chromium
+npm test          # unit tests (TURN credentials, security headers)
+npm run test:e2e  # browser test: a room PC and presenters in headless Chromium
 ```
 
-The browser test starts `server.js` itself. To test the Worker instead, run
-`npx wrangler dev` and `BASE=http://localhost:8787/cast npm run test:e2e`.
-Both run in CI on every pull request.
+The end-to-end test starts `server.js` itself. To test the Worker instead, run `npx wrangler dev` and `BASE=http://localhost:8787/cast npm run test:e2e`. Both run in CI.
 
-## Technical Stack
+## Project structure
 
-- **Frontend**: Vanilla JavaScript, no build step
-- **Signaling**: Durable Object on Cloudflare, or PeerJS on Node.js (`PEER_SERVER=self`), or PeerJS Cloud
-- **WebRTC**: Direct peer-to-peer connections, Cloudflare TURN relay as fallback
-- **Security**: Strict Content Security Policy (scripts only from this site)
-- **UI**: Lucide icons, QRCode.js for code generation
+| Path | What it is |
+|---|---|
+| `public/index.html`, `app.css`, `app.js` | The page (host and presenter views) |
+| `public/icons.js` | Inline SVG icons used by the page |
+| `public/vendor/` | PeerJS and QRCode.js, served locally |
+| `worker/index.js` | Cloudflare Worker: serves `public/`, `/config` and signaling (Durable Object) |
+| `server.js` | Node.js server for local use or Docker |
+| `turn.js`, `headers.js` | Shared by both servers: TURN credentials and security headers |
+| `e2e/`, `test/` | End-to-end and unit tests |
+
+See [TODO.md](TODO.md) for ideas not yet built.
