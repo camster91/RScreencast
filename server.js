@@ -41,6 +41,9 @@ app.get('/config', async (req, res) => {
     });
 });
 
+// Presenters type /join to enter a room code
+app.get('/join', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 

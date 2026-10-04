@@ -31,6 +31,7 @@ const JS = 'text/javascript; charset=utf-8';
 const STATIC_FILES = {
     '/': { body: indexHtml, type: 'text/html; charset=utf-8' },
     '/index.html': { body: indexHtml, type: 'text/html; charset=utf-8' },
+    '/join': { body: indexHtml, type: 'text/html; charset=utf-8' },
     '/app.css': { body: appCss, type: 'text/css; charset=utf-8' },
     '/app.js': { body: appJs, type: JS },
     '/icons.js': { body: iconsJs, type: JS },
@@ -61,8 +62,8 @@ export default {
 
         // Old addresses (REDIRECT_HOSTS) send visitors to CANONICAL_URL
         const redirectHosts = (env.REDIRECT_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean);
-        if (env.CANONICAL_URL && redirectHosts.includes(url.hostname) && (path === '/' || path === '/index.html')) {
-            return Response.redirect(env.CANONICAL_URL + url.search, 301);
+        if (env.CANONICAL_URL && redirectHosts.includes(url.hostname) && (path === '/' || path === '/index.html' || path === '/join')) {
+            return Response.redirect(env.CANONICAL_URL + (path === '/join' ? 'join' : '') + url.search, 301);
         }
 
         const file = STATIC_FILES[path];

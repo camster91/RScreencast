@@ -3,188 +3,240 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickShare Room Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f1a">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Show your laptop on the room screen. No app, no cables.">
+    <title>Cast</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d7cff'/%3E%3Cpath d='M8 10h16v10H8z' fill='none' stroke='white' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M12 24h8' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="app.css">
 </head>
 
 <body>
 
-    <!-- ROOM PC MODE (HOST) -->
-    <div id="room-view">
-        <div id="room-pc-setup" class="hero-card">
-            <div class="room-badge"><i data-lucide="radio"></i> LIVE MEETING ROOM</div>
-            <h1>Ready to Share</h1>
-            <div id="qrcode"></div>
-            <div class="id-display" id="id-display">...</div>
-            <div class="url-helper" id="url-helper">Loading connection...</div>
-            <button class="btn btn-secondary btn-small" style="margin-top:1rem;" data-action="join-as-presenter">
-                <i data-lucide="log-in"></i> Join as Presenter
-            </button>
-        </div>
-
-        <div class="floating-controls" id="floating-controls">
-<button class="btn btn-secondary btn-small lock-room-btn" data-action="toggle-room-lock" title="Stop new join requests">
+    <!-- ROOM SCREEN (HOST) -->
+    <div id="room-view" class="view">
+        <header class="topbar" id="floating-controls">
+            <div class="brand"><span class="brand-mark"><i data-lucide="monitor"></i></span> Cast</div>
+            <div class="topbar-actions">
+                <button class="btn btn-ghost btn-small lock-room-btn" data-action="toggle-room-lock" title="Stop new requests">
                     <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
                 </button>
-            <button class="btn btn-secondary btn-small" data-action="toggle-peer-panel" id="participants-btn" style="position: relative;">
-                <i data-lucide="users"></i> Participants
-                <span class="notification-badge" id="pending-badge" style="display: none;">0</span>
-            </button>
-        </div>
+                <button class="btn btn-ghost btn-small" data-action="toggle-peer-panel" id="participants-btn">
+                    <i data-lucide="users"></i> <span class="participants-label">People</span>
+                    <span class="notification-badge" id="pending-badge" hidden>0</span>
+                </button>
+                <button class="btn btn-ghost btn-small btn-icon" data-action="fullscreen" id="fullscreen-btn" title="Full screen">
+                    <i data-lucide="maximize"></i>
+                </button>
+            </div>
+        </header>
+
+        <main id="room-pc-setup" class="room-setup">
+            <div class="room-steps">
+                <div class="status-pill" id="room-status"><span class="dot"></span> <span id="url-helper">Connecting…</span></div>
+                <h1>Show your laptop on this screen</h1>
+                <ol class="steps">
+                    <li>
+                        <span class="step-num">1</span>
+                        <div>
+                            <div class="step-label">On your laptop, go to</div>
+                            <div class="step-value" id="join-address">…</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">2</span>
+                        <div>
+                            <div class="step-label">Enter this code</div>
+                            <div class="room-code" id="id-display">·····</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">3</span>
+                        <div>
+                            <div class="step-label">Accept the request on this screen</div>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+            <div class="qr-card">
+                <div id="qrcode"></div>
+                <p>Or scan to get the link</p>
+            </div>
+            <a class="host-join-link" href="join">Want to share from this device instead?</a>
+        </main>
 
         <div id="media-container">
             <video id="remote-video" playsinline></video>
 
-            <!-- Show controls button (visible when controls hidden) -->
-            <button id="show-controls-btn" data-action="toggle-viewing-controls">
-                <i data-lucide="eye" style="width:20px;height:20px;"></i>
-            </button>
-
             <div class="viewing-controls" id="viewing-controls">
-                <button class="btn btn-danger" data-action="stop-viewing">
-                    <i data-lucide="x"></i> Exit
-                </button>
                 <div class="viewing-info">
+                    <span class="live-dot"></span>
                     <span id="viewing-name">-</span>
                     <span id="presenter-count"></span>
                 </div>
-                <button class="btn" id="unmute-btn" data-action="unmute" style="display: none;">
-                    <i data-lucide="volume-x"></i> Tap for sound
+                <button class="btn btn-small" id="unmute-btn" data-action="unmute" hidden>
+                    <i data-lucide="volume-x"></i> Turn on sound
                 </button>
-<button class="btn btn-secondary lock-room-btn" data-action="toggle-room-lock" title="Stop new join requests">
-                    <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
-                </button>
-                <button class="btn btn-secondary" id="switch-presenter-btn" data-action="toggle-peer-panel" style="display: none;">
+                <button class="btn btn-ghost btn-small" id="switch-presenter-btn" data-action="toggle-peer-panel" hidden>
                     <i data-lucide="users"></i> Switch
                 </button>
-                <button class="btn btn-secondary" data-action="toggle-viewing-controls" title="Hide controls">
-                    <i data-lucide="eye-off"></i>
+                <button class="btn btn-ghost btn-small lock-room-btn" data-action="toggle-room-lock" title="Stop new requests">
+                    <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
+                </button>
+                <button class="btn btn-danger btn-small" data-action="stop-viewing">
+                    <i data-lucide="square"></i> End share
                 </button>
             </div>
         </div>
 
-        <div id="peer-panel">
+        <aside id="peer-panel" aria-label="People">
             <div class="peer-panel-header">
-                <h3>Participants</h3>
-                <button class="btn btn-secondary btn-small" data-action="toggle-peer-panel">
-                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                <h3>People</h3>
+                <button class="btn btn-ghost btn-small btn-icon" data-action="toggle-peer-panel" title="Close">
+                    <i data-lucide="x"></i>
                 </button>
             </div>
             <div class="peer-list" id="peer-list"></div>
-        </div>
+        </aside>
     </div>
 
-    <!-- MANUAL JOIN -->
-    <div id="manual-join-view">
-        <div class="hero-card">
-            <i data-lucide="log-in" style="width:48px; height:48px; color:var(--primary); margin-bottom:1rem;"></i>
-            <h2>Enter Room Code</h2>
-            <p style="color:var(--text-dim); margin-bottom:1rem;">Enter the 5-character code shown on the host's screen</p>
-            <div style="margin: 1rem 0;">
-                <input type="text" id="manual-input" maxlength="5" placeholder="ABCDE">
+    <!-- ENTER A CODE -->
+    <div id="manual-join-view" class="view">
+        <main class="card">
+            <div class="card-icon"><i data-lucide="monitor-up"></i></div>
+            <h2>Share your screen</h2>
+            <p class="muted">Enter the code shown on the room screen.</p>
+            <div class="phone-note" hidden>
+                <i data-lucide="laptop"></i>
+                <span>Screen sharing needs a laptop or desktop computer. Phones and tablets can't share their screen.</span>
             </div>
-            <div id="join-error" style="color: var(--danger); font-size: 0.9rem; margin-bottom: 1rem; display: none;"></div>
-            <button class="btn btn-full" id="join-submit-btn" data-action="submit-join">
-                <i data-lucide="arrow-right"></i> Join Room
-            </button>
-        </div>
+            <form id="join-form" novalidate>
+                <input type="text" id="manual-input" placeholder="ABCDE" aria-label="Room code"
+                    autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">
+                <div id="join-error" class="field-error" role="alert" hidden></div>
+                <button type="submit" class="btn btn-full" id="join-submit-btn">
+                    Continue <i data-lucide="arrow-right"></i>
+                </button>
+            </form>
+        </main>
     </div>
 
-    <!-- CLIENT SHARE -->
-    <div id="client-view">
-        <div class="hero-card">
+    <!-- PRESENTER -->
+    <div id="client-view" class="view">
+        <main class="card">
             <div id="share-initial">
-                <i data-lucide="monitor-up" style="width:64px; height:64px; color:var(--primary); margin-bottom:1rem;"></i>
-                <h2>Share Your Screen</h2>
-                <p id="target-room-text" style="color:var(--text-dim); margin-bottom:1.5rem;"></p>
-                <button class="btn btn-full" id="join-btn" data-action="start-sharing">
-                    <i data-lucide="hand"></i> Request to Join
-                </button>
-            </div>
-
-            <div id="share-waiting" style="display: none;">
-                <div class="share-status-card waiting">
-                    <h4><i data-lucide="clock" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;"></i> Waiting for Host</h4>
-                    <p>The host needs to approve your request before you can share.</p>
+                <div class="room-chip">Room <strong id="target-room-text"></strong></div>
+                <div class="card-icon"><i data-lucide="monitor-up"></i></div>
+                <h2>Share your screen</h2>
+                <div id="share-supported">
+                    <p class="muted">We'll ask the room to let you in. Then you pick what to show.</p>
+                    <button class="btn btn-full" id="join-btn" data-action="start-sharing">
+                        Ask to share <i data-lucide="arrow-right"></i>
+                    </button>
                 </div>
-                <p class="your-code">Your code: <strong id="my-presenter-code">----</strong>
-                    <span>The host may ask you for it.</span></p>
-            </div>
-
-            <div id="share-approved" style="display: none;">
-                <i data-lucide="check-circle" style="width:48px; height:48px; color:var(--primary); margin-bottom:1rem;"></i>
-                <h2>You're Approved!</h2>
-                <p style="color:var(--text-dim); margin-bottom:1.5rem;">Click below to select which screen or window to share.</p>
-                <button class="btn btn-full" id="select-screen-btn" data-action="share-screen">
-                    <i data-lucide="monitor"></i> Select Screen to Share
-                </button>
-            </div>
-
-            <div id="share-live" style="display: none;">
-                <div class="share-status-card">
-                    <h4><i data-lucide="radio" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;color:var(--primary);"></i> LIVE - Sharing Your Screen</h4>
-                    <p>The host can now see your screen. Click below to stop sharing.</p>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-danger" data-action="stop-sharing">
-                        <i data-lucide="square"></i> Stop Sharing
+                <div id="share-unsupported" hidden>
+                    <div class="phone-note">
+                        <i data-lucide="laptop"></i>
+                        <span>Screen sharing needs a laptop or desktop computer.</span>
+                    </div>
+                    <p class="muted">On your computer, go to <strong class="join-address-text"></strong> and enter <strong class="room-code-text"></strong></p>
+                    <button class="btn btn-ghost btn-full" data-action="send-link">
+                        <i data-lucide="share-2"></i> <span id="send-link-label">Send link to my computer</span>
                     </button>
                 </div>
             </div>
 
-            <div id="share-ended" style="display: none;">
-                <i data-lucide="monitor-x" style="width:48px; height:48px; color:var(--text-dim); margin-bottom:1rem;"></i>
-                <h2>Screen Share Ended</h2>
-                <p style="color:var(--text-dim); margin-bottom:1.5rem;">Your screen share has stopped. You can share a different screen or window if needed.</p>
-                <button class="btn btn-full" data-action="share-screen">
-                    <i data-lucide="monitor-up"></i> Share Another Screen
-                </button>
-            </div>
-
-            <div id="share-denied" style="display: none;">
-                <i data-lucide="x-circle" style="width:48px; height:48px; color:var(--danger); margin-bottom:1rem;"></i>
-                <h2>Request Denied</h2>
-                <p id="denied-message" style="color:var(--text-dim); margin-bottom:1.5rem;">The host did not allow you to join this session.</p>
-                <button class="btn btn-secondary btn-full" data-action="reload">
-                    <i data-lucide="refresh-cw"></i> Try Again
-                </button>
-            </div>
-
-            <div id="share-kicked" style="display: none;">
-                <i data-lucide="user-x" style="width:48px; height:48px; color:var(--danger); margin-bottom:1rem;"></i>
-                <h2>Removed from Room</h2>
-                <p style="color:var(--text-dim); margin-bottom:1.5rem;">You were removed from the session by the host.</p>
-                <button class="btn btn-secondary btn-full" data-action="reload">
-                    <i data-lucide="refresh-cw"></i> Rejoin Room
-                </button>
-            </div>
-
-            <div id="share-error" style="display: none;">
-                <div class="share-status-card error">
-                    <h4><i data-lucide="alert-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:5px;"></i> Connection Error</h4>
-                    <p id="error-message">Could not connect to the room.</p>
+            <div id="share-waiting" hidden>
+                <div class="spinner" aria-hidden="true"></div>
+                <h2>Waiting to be let in…</h2>
+                <p class="muted">Someone at the room screen needs to accept you.</p>
+                <div class="your-code">
+                    <span>Your code</span>
+                    <strong id="my-presenter-code">----</strong>
+                    <small>They'll see the same code on the room screen.</small>
                 </div>
-                <button class="btn btn-secondary btn-full" style="margin-top:1rem;" data-action="reload">
-                    <i data-lucide="refresh-cw"></i> Try Again
+            </div>
+
+            <div id="share-approved" hidden>
+                <div class="card-icon success"><i data-lucide="check-circle"></i></div>
+                <h2>You're in</h2>
+                <p class="muted">Choose a whole screen, a window or a browser tab.</p>
+                <button class="btn btn-full" id="select-screen-btn" data-action="share-screen">
+                    <i data-lucide="monitor"></i> Choose what to share
                 </button>
+                <p class="hint">Playing a video? Share a tab and turn on "Share tab audio".</p>
+            </div>
+
+            <div id="share-live" hidden>
+                <div class="live-badge"><span class="live-dot"></span> Live</div>
+                <h2>You're on the room screen</h2>
+                <p class="muted">Everyone in the room can see what you're sharing.</p>
+                <div class="button-group">
+                    <button class="btn btn-ghost" data-action="share-screen">
+                        <i data-lucide="refresh-cw"></i> Switch
+                    </button>
+                    <button class="btn btn-danger" data-action="stop-sharing">
+                        <i data-lucide="square"></i> Stop sharing
+                    </button>
+                </div>
+            </div>
+
+            <div id="share-ended" hidden>
+                <div class="card-icon dim"><i data-lucide="monitor-x"></i></div>
+                <h2>Sharing stopped</h2>
+                <p class="muted" id="ended-message">You're no longer on the room screen.</p>
+                <button class="btn btn-full" data-action="share-screen">
+                    <i data-lucide="monitor-up"></i> Share again
+                </button>
+            </div>
+
+            <div id="share-denied" hidden>
+                <div class="card-icon danger"><i data-lucide="x-circle"></i></div>
+                <h2>Not accepted</h2>
+                <p class="muted" id="denied-message">The room didn't accept your request.</p>
+                <button class="btn btn-ghost btn-full" data-action="reload">
+                    <i data-lucide="refresh-cw"></i> Ask again
+                </button>
+            </div>
+
+            <div id="share-kicked" hidden>
+                <div class="card-icon danger"><i data-lucide="user-x"></i></div>
+                <h2>You were removed</h2>
+                <p class="muted">The room removed you from the screen.</p>
+                <button class="btn btn-ghost btn-full" data-action="reload">
+                    <i data-lucide="refresh-cw"></i> Ask again
+                </button>
+            </div>
+
+            <div id="share-error" hidden>
+                <div class="card-icon danger"><i data-lucide="alert-circle"></i></div>
+                <h2>Can't connect</h2>
+                <p class="muted" id="error-message">Could not connect to the room.</p>
+                <button class="btn btn-full" data-action="reload">
+                    <i data-lucide="refresh-cw"></i> Try again
+                </button>
+                <a class="text-link" href="join">Enter a different code</a>
+            </div>
+        </main>
+    </div>
+
+    <!-- ACCEPT A PRESENTER -->
+    <div class="modal-overlay" id="approval-modal" role="dialog" aria-modal="true" aria-labelledby="approval-title">
+        <div class="modal">
+            <h3 id="approval-title"><span id="requester-name">Someone</span> wants to share</h3>
+            <div class="code-check">
+                <strong id="requester-code">----</strong>
+                <span>Check that their laptop shows this code</span>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-ghost" data-action="deny">Decline</button>
+                <button class="btn" data-action="approve">Accept</button>
             </div>
         </div>
     </div>
 
-    <!-- APPROVAL MODAL -->
-    <div class="modal-overlay" id="approval-modal">
-        <div class="modal">
-            <h3>New Presenter Request</h3>
-            <p><strong id="requester-name">Someone</strong> wants to share their screen</p>
-            <p class="code-check">Ask them to confirm this code is on their screen:
-                <strong id="requester-code">----</strong></p>
-            <div class="modal-buttons">
-                <button class="btn btn-danger" data-action="deny">Deny</button>
-                <button class="btn" data-action="approve">Allow</button>
-            </div>
-        </div>
-    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
 
     <script src="vendor/peerjs.min.js"></script>
     <script src="vendor/qrcode.min.js"></script>
