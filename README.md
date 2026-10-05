@@ -55,6 +55,9 @@ npx wrangler dev
 | `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | empty | Cloudflare TURN key; the server exchanges it for short-lived credentials |
 | `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | empty | Any other TURN server (also used as a fallback) |
 | `PEERJS_DEBUG` | `false` | Extra PeerJS logging |
+| `TRUST_PROXY` | off | Set when the Node.js server runs behind a reverse proxy, so the rate limit sees each visitor's real IP. `1` for one proxy (Nginx, Traefik, Coolify), or a list of proxy IPs/subnets. Leave it off when the server faces the internet directly, or visitors could fake their IP |
+| `RATE_LIMIT_PER_MINUTE` | `300` | Requests per minute per IP on the Node.js server (`/health` is never limited) |
+| `CONFIG_RATE_LIMIT_PER_MINUTE` | `60` | Lower limit for `/config`, which hands out TURN credentials |
 
 The browser loads its ICE server list from `/config` and refreshes it every hour. To deploy the Worker to your own Cloudflare account, update the account and routes in `wrangler.toml`, set the two TURN secrets with `npx wrangler secret put`, and run `npx wrangler deploy`.
 

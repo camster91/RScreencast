@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const http = require('http');
 const { ExpressPeerServer } = require('peer');
 const path = require('path');
@@ -9,8 +10,33 @@ const app = express();
 
 const port = process.env.PORT || 3000;
 
-// Enable trust proxy for Nginx/reverse proxy environments
-app.set('trust proxy', true);
+// Which reverse proxies may tell us the visitor's IP (X-Forwarded-For).
+// Off by default, so visitors can't fake their IP to dodge the rate limit.
+// Behind one proxy (Nginx, Traefik, Coolify) set TRUST_PROXY=1.
+function parseTrustProxy(value) {
+    if (!value || value === 'false') return false;
+    if (value === 'true') return true;
+    if (/^\d+$/.test(value)) return parseInt(value, 10);
+    return value; // IPs or subnets, e.g. "loopback, 10.0.0.0/8"
+}
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+app.set('trust proxy', trustProxy);
+
+// Requests per minute from one IP. A whole office can share one IP, so
+// these are generous; /config is lower because it hands out TURN credentials.
+function limitPerMinute(name, fallback) {
+    const value = parseInt(process.env[name], 10);
+    return value > 0 ? value : fallback;
+}
+function limiter(max) {
+    return rateLimit({
+        windowMs: 60 * 1000,
+        limit: max,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: { error: 'Too many requests. Try again in a minute.' }
+    });
+}
 
 // Security headers
 app.use((req, res, next) => {
@@ -24,8 +50,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// Health check and favicon
+// Health check (not rate limited, so uptime checks always work)
 app.get('/health', (req, res) => res.send('OK'));
+
+app.use(limiter(limitPerMinute('RATE_LIMIT_PER_MINUTE', 300)));
+app.use('/config', limiter(limitPerMinute('CONFIG_RATE_LIMIT_PER_MINUTE', 60)));
+
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Client settings: which signaling server to use and extra ICE servers
@@ -56,7 +86,7 @@ const server = http.createServer(app);
 const peerServer = ExpressPeerServer(server, {
     debug: process.env.PEERJS_DEBUG === 'true',
     path: '/',
-    proxied: true
+    proxied: Boolean(trustProxy)
 });
 
 // Mount signaling server
