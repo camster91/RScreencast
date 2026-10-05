@@ -1,14 +1,20 @@
 renderIcons();
 const params = new URLSearchParams(window.location.search);
 const rawRoomId = params.get('room');
-const isJoinMode = params.get('mode') === 'join';
 // Folder the app is served from ("/" or e.g. "/cast/"); server URLs are relative to it
 const BASE_PATH = window.location.pathname.replace(/[^/]*$/, '');
+// Presenters type ".../join"; ?mode=join is the older address
+const isJoinMode = /\/join$/.test(window.location.pathname) || params.get('mode') === 'join';
+const JOIN_ADDRESS = window.location.host + BASE_PATH + 'join';
 
 // Validate room code format - only allow alphanumeric, max 10 chars
 if (rawRoomId && !/^[A-Za-z0-9]{1,10}$/.test(rawRoomId)) {
-    window.location.search = '?mode=join';
+    window.location.href = BASE_PATH + 'join';
 }
+
+// Phones and tablets can't share their screen from a browser
+const canShareScreen = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) &&
+    !(navigator.userAgentData && navigator.userAgentData.mobile);
 
 // Room codes are uppercase, so ?room=abcde still finds room ABCDE
 const roomId = rawRoomId ? rawRoomId.toUpperCase() : null;
@@ -141,14 +147,14 @@ function onPeerError(err) {
             hostRoomCode = saveHostRoomCode(generateRoomCode());
             idTakenAttempts = 0;
         }
-        showHostStatus('Getting a room code...');
+        showHostStatus('Getting a room code…');
         setTimeout(() => createPeer(hostRoomCode), idTakenAttempts ? 3000 : 0);
         return;
     }
 
     // PeerJS fires this on the Peer object, not the connection
     if (err.type === 'peer-unavailable' && roomId) {
-        showClientError('Room "' + roomId + '" not found. Check the code and try again.');
+        showRoomNotFound();
     }
 }
 
@@ -159,7 +165,7 @@ function scheduleReconnect() {
     reconnectAttempts++;
     const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts - 1));
     console.log(`Reconnecting (attempt ${reconnectAttempts}) in ${delay}ms...`);
-    if (isHosting) showHostStatus('Reconnecting to server...');
+    if (isHosting) showHostStatus('Reconnecting…');
 
     reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
@@ -181,7 +187,7 @@ function recoverPeer() {
     if (isHosting) {
         createPeer(hostRoomCode);
     } else {
-        showClientError('Lost connection to the server. Please try again.');
+        showClientError('Lost the connection. Check your Wi-Fi and try again.');
     }
 }
 
@@ -223,11 +229,21 @@ function stopStream(stream) {
 
 // Route to correct view
 if (roomId) {
+    document.title = 'Cast · Share to ' + roomId;
+    document.getElementById('target-room-text').innerText = roomId;
+    document.getElementById('share-supported').hidden = !canShareScreen;
+    document.getElementById('share-unsupported').hidden = canShareScreen;
+    document.querySelectorAll('.join-address-text').forEach(el => { el.innerText = JOIN_ADDRESS; });
+    document.querySelectorAll('.room-code-text').forEach(el => { el.innerText = roomId; });
     showView('client-view');
-    document.getElementById('target-room-text').innerText = "Room: " + roomId;
 } else if (isJoinMode) {
+    document.title = 'Cast · Share your screen';
+    document.querySelector('#manual-join-view .phone-note').hidden = canShareScreen;
     showView('manual-join-view');
+    document.getElementById('manual-input').focus();
 } else {
+    document.getElementById('join-address').innerText = JOIN_ADDRESS;
+    if (!document.fullscreenEnabled) document.getElementById('fullscreen-btn').hidden = true;
     showView('room-view');
 }
 
@@ -276,44 +292,68 @@ function showView(id) {
     renderIcons();
 }
 
-function validateJoinInput(event) {
+function cleanJoinInput() {
     const input = document.getElementById('manual-input');
-    const errorEl = document.getElementById('join-error');
-
-    // Auto-uppercase and filter invalid characters
-    input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-    // Hide error while typing
-    errorEl.style.display = 'none';
-
-    // Submit on Enter key
-    if (event && event.key === 'Enter') {
-        submitJoin();
-    }
+    // A pasted link works too
+    const fromLink = input.value.match(/room=([A-Za-z0-9]{5})/);
+    input.value = (fromLink ? fromLink[1] : input.value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    document.getElementById('join-error').hidden = true;
 }
 
-function submitJoin() {
+function submitJoin(event) {
+    if (event) event.preventDefault();
     const val = document.getElementById('manual-input').value.toUpperCase().trim();
     const errorEl = document.getElementById('join-error');
 
-    if (!val) {
-        errorEl.innerText = 'Please enter a room code';
-        errorEl.style.display = 'block';
+    if (val.length !== 5) {
+        errorEl.innerText = val ? 'Codes have 5 letters and numbers.' : 'Enter the code shown on the room screen.';
+        errorEl.hidden = false;
+        document.getElementById('manual-input').focus();
         return;
     }
 
-    if (val.length < 5) {
-        errorEl.innerText = 'Room codes are 5 characters long';
-        errorEl.style.display = 'block';
-        return;
-    }
-
-    // Valid code, redirect to join
-    window.location.search = '?room=' + val;
+    window.location.href = BASE_PATH + '?room=' + val;
 }
 
 function togglePeerPanel() {
     document.getElementById('peer-panel').classList.toggle('visible');
+    wakeControls();
+}
+
+function toggleFullscreen() {
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    } else {
+        document.documentElement.requestFullscreen().catch(() => {});
+    }
+}
+
+let toastTimer = null;
+function showToast(text) {
+    const toast = document.getElementById('toast');
+    toast.innerText = text;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 2500);
+}
+
+// Phone users: hand the link to their laptop
+async function sendLink() {
+    const url = window.location.origin + BASE_PATH + '?room=' + roomId;
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'Cast', text: 'Share your screen to room ' + roomId, url });
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied');
+    } catch (e) {
+        showToast(url);
+    }
 }
 
 // ========== HOST FUNCTIONS ==========
@@ -321,13 +361,15 @@ let qrCodeText = null;
 
 function setupHostDisplay(id) {
     document.getElementById('id-display').innerText = id;
-    const joinUrl = window.location.origin + window.location.pathname + '?room=' + id;
-    document.getElementById('url-helper').innerHTML = `Go to <strong>${escapeHtml(window.location.host)}</strong> and enter code`;
+    document.title = 'Cast · Room ' + id;
+    const joinUrl = window.location.origin + BASE_PATH + '?room=' + id;
+    document.getElementById('url-helper').innerText = 'Ready';
+    document.getElementById('room-status').classList.add('ready');
     // Redraw the QR code only when the room code changes
     if (qrCodeText !== joinUrl) {
         const qrEl = document.getElementById("qrcode");
         qrEl.innerHTML = '';
-        new QRCode(qrEl, { text: joinUrl, width: 180, height: 180 });
+        new QRCode(qrEl, { text: joinUrl, width: 320, height: 320, correctLevel: QRCode.CorrectLevel.M });
         qrCodeText = joinUrl;
     }
     renderIcons();
@@ -335,6 +377,7 @@ function setupHostDisplay(id) {
 
 function showHostStatus(text) {
     document.getElementById('url-helper').innerText = text;
+    document.getElementById('room-status').classList.remove('ready');
 }
 
 // Handle data connections (for approval)
@@ -504,6 +547,7 @@ function toggleRoomLock() {
             : '<i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>';
     });
     renderIcons();
+    showToast(roomLocked ? 'Room locked. New requests are turned away.' : 'Room unlocked');
 }
 
 function showNextApproval() {
@@ -560,13 +604,8 @@ function handleApproval(approved) {
 
 function updatePendingBadge() {
     const badge = document.getElementById('pending-badge');
-    const count = pendingApprovals.length;
-    if (count > 0) {
-        badge.style.display = 'flex';
-        badge.innerText = count;
-    } else {
-        badge.style.display = 'none';
-    }
+    badge.innerText = pendingApprovals.length;
+    badge.hidden = pendingApprovals.length === 0;
 }
 
 function updatePeerList() {
@@ -583,11 +622,11 @@ function updatePeerList() {
         const hasStream = !!data.stream;
         if (hasStream) streamCount++;
 
-        let statusText = 'Connected';
+        let statusText = 'Connected, not sharing';
         if (isPending) {
-            statusText = 'Waiting for approval...';
+            statusText = 'Waiting to be accepted';
         } else if (hasStream) {
-            statusText = isActive ? '● Currently viewing' : 'Click to view screen';
+            statusText = isActive ? 'On screen now' : 'Sharing · click to show';
         }
 
         const safePeerId = escapeHtml(peerId);
@@ -596,15 +635,14 @@ function updatePeerList() {
         // Peer IDs go in data attributes, never inline JS
         html += `
             <div class="peer-item ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}"
-                 data-peer-id="${safePeerId}" data-action="${hasStream ? 'view' : ''}"
-                 style="${hasStream && !isActive ? 'cursor: pointer;' : ''}">
+                 data-peer-id="${safePeerId}" data-action="${hasStream ? 'view' : ''}">
                 <div class="peer-info">
                     <div class="peer-name">${safeName}</div>
                     <div class="peer-status">${statusText}</div>
                 </div>
                 <div class="peer-actions">
-                    <button class="btn btn-danger btn-small" data-peer-id="${safePeerId}" data-action="kick" title="Remove">
-                        <i data-lucide="x" style="width:14px;height:14px;"></i>
+                    <button class="btn btn-small" data-peer-id="${safePeerId}" data-action="kick" title="Remove" aria-label="Remove ${safeName}">
+                        <i data-lucide="x"></i>
                     </button>
                 </div>
             </div>
@@ -612,18 +650,17 @@ function updatePeerList() {
     });
 
     if (count === 0) {
-        html = '<div style="padding: 1rem; color: var(--text-dim); text-align: center;">No participants yet</div>';
+        html = '<div class="peer-empty">No one has joined yet.</div>';
     } else if (streamCount > 1) {
-        html = '<div style="padding: 0.5rem 1rem; background: rgba(34, 197, 94, 0.1); color: var(--primary); font-size: 0.8rem; text-align: center;">Click a presenter to switch view</div>' + html;
+        html = '<div class="peer-tip">Click someone to put their screen on the display</div>' + html;
     }
 
     list.innerHTML = html;
 
-    // Update button text
-    document.querySelector('#participants-btn').innerHTML = `
-        <i data-lucide="users"></i> Participants (${count})
-        <span class="notification-badge" id="pending-badge" style="display: ${pendingApprovals.length ? 'flex' : 'none'};">${pendingApprovals.length}</span>
-    `;
+    const peopleBtn = document.getElementById('participants-btn');
+    peopleBtn.dataset.count = count;
+    peopleBtn.querySelector('.participants-label').innerText = count ? `People · ${count}` : 'People';
+    updatePendingBadge();
     updateViewingInfo();
     renderIcons();
 }
@@ -676,6 +713,7 @@ function viewPeer(peerId) {
     document.getElementById('room-pc-setup').style.display = 'none';
     document.getElementById('floating-controls').style.display = 'none';
     document.getElementById('media-container').style.display = 'block';
+    wakeControls();
 
     const video = document.getElementById('remote-video');
     if (video.srcObject !== peerData.stream) {
@@ -690,7 +728,7 @@ function updateViewingInfo() {
     const peerData = currentViewingPeer && connectedPeers.get(currentViewingPeer);
     if (!peerData) return;
 
-    document.getElementById('viewing-name').innerText = 'Viewing: ' + peerData.name;
+    document.getElementById('viewing-name').innerText = peerData.name;
 
     // Count presenters with active streams
     let presenterCount = 0;
@@ -701,13 +739,8 @@ function updateViewingInfo() {
     // Show switch button only if multiple presenters
     const switchBtn = document.getElementById('switch-presenter-btn');
     const countEl = document.getElementById('presenter-count');
-    if (presenterCount > 1) {
-        switchBtn.style.display = 'inline-flex';
-        countEl.innerText = `(${presenterCount} presenters active)`;
-    } else {
-        switchBtn.style.display = 'none';
-        countEl.innerText = '';
-    }
+    switchBtn.hidden = presenterCount < 2;
+    countEl.innerText = presenterCount > 1 ? `· ${presenterCount} sharing` : '';
 }
 
 // Browsers block video with sound from auto-playing until someone has
@@ -732,11 +765,8 @@ function playRemoteVideo() {
 }
 
 function setUnmuteVisible(show) {
-    document.getElementById('unmute-btn').style.display = show ? 'inline-flex' : 'none';
-    if (show) {
-        document.getElementById('viewing-controls').classList.remove('minimized');
-        document.getElementById('show-controls-btn').classList.remove('visible');
-    }
+    document.getElementById('unmute-btn').hidden = !show;
+    wakeControls();
 }
 
 function unmuteVideo() {
@@ -748,35 +778,46 @@ function unmuteVideo() {
 
 // Tapping the video also turns the sound on
 document.getElementById('remote-video').addEventListener('click', () => {
-    if (document.getElementById('unmute-btn').style.display !== 'none') unmuteVideo();
+    if (!document.getElementById('unmute-btn').hidden) unmuteVideo();
 });
 
 function stopViewing() {
     currentViewingPeer = null;
-    document.getElementById('room-pc-setup').style.display = 'flex';
-    document.getElementById('floating-controls').style.display = 'flex';
+    document.getElementById('room-pc-setup').style.display = '';
+    document.getElementById('floating-controls').style.display = '';
     document.getElementById('media-container').style.display = 'none';
     document.getElementById('remote-video').srcObject = null;
     setUnmuteVisible(false);
-    // Reset controls visibility
-    document.getElementById('viewing-controls').classList.remove('minimized');
-    document.getElementById('show-controls-btn').classList.remove('visible');
     updatePeerList();
 }
 
-function toggleViewingControls() {
-    const controls = document.getElementById('viewing-controls');
-    const showBtn = document.getElementById('show-controls-btn');
-
-    if (controls.classList.contains('minimized')) {
-        controls.classList.remove('minimized');
-        showBtn.classList.remove('visible');
-    } else {
-        controls.classList.add('minimized');
-        showBtn.classList.add('visible');
+// "End share" on the room screen: stop the presenter's share and tell them
+function endViewedShare() {
+    const peerId = currentViewingPeer;
+    const peerData = peerId && connectedPeers.get(peerId);
+    if (!peerData || !peerData.call) {
+        stopViewing();
+        return;
     }
-    renderIcons();
+    try { peerData.conn.send({ type: 'share-ended' }); } catch (e) { console.warn('Send failed:', e); }
+    endCall(peerId, peerData.call);
 }
+
+// Controls over the shared screen fade out until the mouse moves
+let controlsTimer = null;
+function wakeControls() {
+    const container = document.getElementById('media-container');
+    container.classList.remove('idle');
+    clearTimeout(controlsTimer);
+    controlsTimer = setTimeout(() => {
+        const keepVisible = !document.getElementById('unmute-btn').hidden ||
+            document.getElementById('peer-panel').classList.contains('visible');
+        if (!keepVisible) container.classList.add('idle');
+    }, 3000);
+}
+['pointermove', 'pointerdown', 'keydown'].forEach((type) => {
+    document.addEventListener(type, () => { if (currentViewingPeer) wakeControls(); }, { passive: true });
+});
 
 // ========== CLIENT FUNCTIONS ==========
 let currentStream = null;
@@ -787,7 +828,7 @@ let clientDone = false; // reached a final state (denied, kicked, error)
 function showClientState(state) {
     const states = ['share-initial', 'share-waiting', 'share-approved', 'share-live', 'share-ended', 'share-denied', 'share-kicked', 'share-error'];
     states.forEach(s => {
-        document.getElementById(s).style.display = s === state ? 'block' : 'none';
+        document.getElementById(s).hidden = s !== state;
     });
     renderIcons();
 }
@@ -806,7 +847,7 @@ function waitForPeerOpen(timeoutMs) {
         (function check() {
             if (peer && peer.open) return resolve();
             if (Date.now() - start > timeoutMs) {
-                return reject(new Error('Could not reach the server. Check your internet connection and try again.'));
+                return reject(new Error("Can't reach Cast. Check your Wi-Fi and try again."));
             }
             setTimeout(check, 200);
         })();
@@ -833,7 +874,7 @@ async function startSharing() {
     // If the room doesn't exist, the connection never opens
     const openTimeout = setTimeout(() => {
         console.error('Connection timeout - room may not exist');
-        showClientError('Room "' + roomId + '" not found. The room may have closed or the code is incorrect.');
+        showRoomNotFound();
         conn.close();
     }, 10000);
 
@@ -856,9 +897,12 @@ async function startSharing() {
             endShare(false);
             if (data.reason === 'locked') {
                 document.getElementById('denied-message').innerText =
-                    'This room is locked. Ask the host to unlock it.';
+                    'This room is locked right now. Ask someone at the room screen to unlock it.';
             }
             showClientState('share-denied');
+        } else if (data.type === 'share-ended') {
+            endShare(false);
+            showShareEnded('The room screen ended your share.');
         } else if (data.type === 'kicked') {
             clientDone = true;
             endShare(false);
@@ -869,25 +913,25 @@ async function startSharing() {
     conn.on('error', (err) => {
         clearTimeout(openTimeout);
         console.error('Connection error:', err);
-        showClientError('Could not connect to the room. Please check the room code and try again.');
+        showClientError("Couldn't connect to the room. Check the code and try again.");
     });
 
     onConnectionFailed(conn, () => {
         clearTimeout(openTimeout);
-        showClientError('Lost connection to the room. The host may have left.');
+        showClientError('Lost the connection to the room screen.');
     });
 
     conn.on('close', () => {
         clearTimeout(openTimeout);
         showClientError(opened
-            ? 'The room was closed or the host disconnected.'
-            : 'Connection closed. The room may no longer be available.');
+            ? 'The room screen was closed.'
+            : "The room isn't available right now.");
     });
 }
 
 async function shareScreen() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        showClientError("This browser can't share its screen. Use Chrome, Edge or Firefox on a computer.");
+        showClientError("This browser can't share its screen. Use Chrome, Edge, Firefox or Safari on a computer.");
         return;
     }
 
@@ -895,9 +939,9 @@ async function shareScreen() {
     try {
         stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
     } catch (e) {
-        // User cancelled screen selection - show approved state again
+        // User cancelled screen selection: go back to the last screen
         if (e.name === 'NotAllowedError') {
-            showClientState('share-approved');
+            if (!currentStream) showClientState('share-approved');
         } else {
             showClientError(e.message);
         }
@@ -921,7 +965,7 @@ async function shareScreen() {
     currentStream = stream;
     const call = peer.call(roomId, stream);
     if (!call) {
-        showClientError('Lost connection to the server. Please try again.');
+        showClientError('Lost the connection. Check your Wi-Fi and try again.');
         return;
     }
     currentCall = call;
@@ -931,7 +975,7 @@ async function shareScreen() {
     const onCallEnded = () => {
         if (currentCall !== call) return;
         endShare(false);
-        if (!clientDone) showClientState('share-ended');
+        showShareEnded();
     };
     call.on('close', onCallEnded);
     call.on('error', onCallEnded);
@@ -942,7 +986,7 @@ async function shareScreen() {
         videoTrack.addEventListener('ended', () => {
             if (currentStream !== stream) return;
             endShare(true);
-            if (!clientDone) showClientState('share-ended');
+            showShareEnded();
         });
     }
 }
@@ -964,7 +1008,17 @@ function endShare(notifyHost) {
 
 function stopSharing() {
     endShare(true);
+    showShareEnded();
+}
+
+function showShareEnded(message) {
+    if (clientDone) return;
+    document.getElementById('ended-message').innerText = message || "You're no longer on the room screen.";
     showClientState('share-ended');
+}
+
+function showRoomNotFound() {
+    showClientError(`Room ${roomId} wasn't found. Check the code on the room screen and try again.`);
 }
 
 // Clean up resources when page unloads
@@ -981,12 +1035,11 @@ window.addEventListener('beforeunload', () => {
 
 // ========== BUTTONS ==========
 const ACTIONS = {
-    'join-as-presenter': () => { window.location.search = '?mode=join'; },
     'toggle-peer-panel': togglePeerPanel,
-    'toggle-viewing-controls': toggleViewingControls,
-    'stop-viewing': stopViewing,
+    'fullscreen': toggleFullscreen,
+    'stop-viewing': endViewedShare,
     'unmute': unmuteVideo,
-    'submit-join': submitJoin,
+    'send-link': sendLink,
     'start-sharing': startSharing,
     'share-screen': shareScreen,
     'stop-sharing': stopSharing,
@@ -1002,4 +1055,5 @@ document.addEventListener('click', (event) => {
     if (action) action();
 });
 
-document.getElementById('manual-input').addEventListener('keyup', validateJoinInput);
+document.getElementById('manual-input').addEventListener('input', cleanJoinInput);
+document.getElementById('join-form').addEventListener('submit', submitJoin);

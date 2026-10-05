@@ -16,7 +16,7 @@ let server = null;
 let browser = null;
 
 const CODE_SHOWN = () => /^[A-Z0-9]{5}$/.test(document.getElementById('id-display').innerText);
-const PARTICIPANTS_ZERO = () => /Participants \(0\)/.test(document.getElementById('participants-btn').innerText);
+const PARTICIPANTS_ZERO = () => document.getElementById('participants-btn').dataset.count === '0';
 
 async function waitForServer(url, timeoutMs) {
     const end = Date.now() + timeoutMs;
@@ -30,8 +30,13 @@ async function waitForServer(url, timeoutMs) {
 }
 
 // Fake screen share (animated canvas + audio tone) and a log of page problems
-async function newContext({ blockAutoplay = false } = {}) {
+async function newContext({ blockAutoplay = false, phone = false } = {}) {
     const context = await browser.newContext();
+    if (phone) {
+        // Phone browsers have no screen sharing
+        await context.addInitScript(() => { delete MediaDevices.prototype.getDisplayMedia; });
+        return context;
+    }
     await context.addInitScript(() => {
         navigator.mediaDevices.getDisplayMedia = async () => {
             const canvas = document.createElement('canvas');
@@ -154,6 +159,17 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         assert.ok(!(await host.locator('#unmute-btn').isVisible()));
     });
 
+    await t.test('"End share" on the room screen stops the presenter', async () => {
+        await host.mouse.move(200, 200);
+        await host.click('[data-action="stop-viewing"]');
+        await host.waitForSelector('#room-pc-setup', { state: 'visible', timeout: 5000 });
+        await presenter.waitForSelector('#share-ended', { state: 'visible', timeout: 5000 });
+        assert.match(await presenter.locator('#ended-message').innerText(), /room screen ended/);
+        assert.strictEqual(await presenter.evaluate(() => window.__fakeStream.getVideoTracks()[0].readyState), 'ended');
+        await presenter.click('#share-ended [data-action="share-screen"]');
+        await host.waitForSelector('#media-container', { state: 'visible', timeout: 15000 });
+    });
+
     await t.test('stop sharing returns the host to idle', async () => {
         await presenter.click('[data-action="stop-sharing"]');
         await host.waitForSelector('#room-pc-setup', { state: 'visible', timeout: 5000 });
@@ -255,7 +271,31 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         const p = await newPresenter('ZZZZZ');
         await p.click('#join-btn');
         await p.waitForSelector('#share-error', { state: 'visible', timeout: 15000 });
-        assert.match(await p.locator('#error-message').innerText(), /not found/);
+        assert.match(await p.locator('#error-message').innerText(), /wasn't found/);
+        await p.context().close();
+    });
+
+    await t.test('/join page takes a code, even from a pasted link', async () => {
+        const p = watch(await (await newContext()).newPage(), 'joiner');
+        await p.goto(`${BASE}/join`);
+        assert.ok(await p.locator('#manual-input').isVisible());
+        assert.ok(!(await p.locator('#manual-join-view .phone-note').isVisible()), 'no phone warning on a computer');
+        await p.click('#join-submit-btn');
+        assert.match(await p.locator('#join-error').innerText(), /code/);
+        await p.fill('#manual-input', 'https://example.com/cast/?room=ab2cd');
+        assert.strictEqual(await p.inputValue('#manual-input'), 'AB2CD');
+        await p.press('#manual-input', 'Enter');
+        await p.waitForURL(/\?room=AB2CD$/);
+        assert.ok(await p.locator('#join-btn').isVisible());
+        await p.context().close();
+    });
+
+    await t.test('phones are told to use a computer before asking to join', async () => {
+        const p = watch(await (await newContext({ phone: true })).newPage(), 'phone');
+        await p.goto(`${BASE}/?room=${code}`);
+        assert.ok(await p.locator('#share-unsupported').isVisible());
+        assert.ok(!(await p.locator('#join-btn').isVisible()));
+        assert.match(await p.locator('#share-unsupported').innerText(), new RegExp(`/join and enter ${code}`));
         await p.context().close();
     });
 

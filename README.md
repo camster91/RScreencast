@@ -11,9 +11,9 @@ Meeting rooms often need a way for guests to put their screen on the room displa
 ## Key features
 
 - **Host mode (room PC)**: generates a 5-character room code that survives reloads, shows a QR code, displays the shared screen full-screen and keeps the display awake (Screen Wake Lock)
-- **Join mode (presenter)**: scan or type the code, request to join, then choose a screen or window with the browser's screen capture picker
-- **Host approval**: presenters can only share after the host clicks Allow. A 4-character check code is shown on both screens so the host can confirm who is asking
-- **Several presenters**: multiple people can join; the host switches between them, removes them, or locks the room to new requests
+- **Join mode (presenter)**: go to `/join` (shown on the room screen) and type the code, or scan the QR code, ask to share, then choose a screen, window or tab. Phones are told up front to use a computer and can send the link to it
+- **Host approval**: presenters can only share after someone at the room screen clicks Accept. A 4-character check code is shown on both screens so the host can confirm who is asking
+- **Several presenters**: multiple people can join; the room screen switches between them, ends a share, removes people, or locks the room to new requests. Controls fade out while a screen is shown
 - **Self-healing connections**: reconnects on its own when the network or signaling server drops, and cleans up presenters who leave, crash or go offline
 - **Two server options from one codebase**: a Cloudflare Worker with signaling in a Durable Object, or a Node.js/Express server with a PeerJS signaling server (also packaged as a Docker image)
 - **TURN relay support**: Cloudflare TURN with short-lived credentials minted on the server (the API token never reaches the browser), or any TURN server with fixed credentials
@@ -38,7 +38,7 @@ cp .env.example .env   # optional: signaling mode and TURN settings
 npm start              # Node.js server on PORT (default 3000)
 ```
 
-Open the page on the room PC to get a room code, then open it on a laptop and join with that code.
+Open the page on the room PC to get a room code, then open `/join` on a laptop and enter that code.
 
 To run the Cloudflare Worker version locally instead:
 
@@ -55,6 +55,9 @@ npx wrangler dev
 | `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | empty | Cloudflare TURN key; the server exchanges it for short-lived credentials |
 | `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | empty | Any other TURN server (also used as a fallback) |
 | `PEERJS_DEBUG` | `false` | Extra PeerJS logging |
+| `TRUST_PROXY` | off | Set when the Node.js server runs behind a reverse proxy, so the rate limit sees each visitor's real IP. `1` for one proxy (Nginx, Traefik, Coolify), or a list of proxy IPs/subnets. Leave it off when the server faces the internet directly, or visitors could fake their IP |
+| `RATE_LIMIT_PER_MINUTE` | `300` | Requests per minute per IP on the Node.js server (`/health` is never limited) |
+| `CONFIG_RATE_LIMIT_PER_MINUTE` | `60` | Lower limit for `/config`, which hands out TURN credentials |
 
 The browser loads its ICE server list from `/config` and refreshes it every hour. To deploy the Worker to your own Cloudflare account, update the account and routes in `wrangler.toml`, set the two TURN secrets with `npx wrangler secret put`, and run `npx wrangler deploy`.
 
