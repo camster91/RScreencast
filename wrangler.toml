@@ -3,17 +3,19 @@ main = "worker/index.js"
 compatibility_date = "2026-09-01"
 account_id = "be5629964da6a37742ab021584b224d8"
 
-# Main address: rotmanav.ca/cast/ (rotmanav.ca zone lives in this account).
-# share.rotmanav.ca redirects there. workers.dev is off: it would bypass the
-# zone's rate-limit rule.
-routes = [
-  # Wildcard so /cast?room=CODE (QR links) also matches
-  { pattern = "rotmanav.ca/cast*", zone_name = "rotmanav.ca" },
-  # Short address for presenters; redirects to /cast/join
-  { pattern = "rotmanav.ca/join*", zone_name = "rotmanav.ca" },
-  { pattern = "share.rotmanav.ca", custom_domain = true }
-]
+# Routes and custom domains are set in the Cloudflare dashboard (Workers ->
+# quickshare -> Settings -> Domains & Routes), so no addresses live in this
+# repo. Deploys leave them as they are. Use a wildcard route like
+# example.com/cast* so /cast?room=CODE (QR links) also matches, and add
+# example.com/join* for the short presenter address.
+# workers.dev is off: it would bypass the zone's rate-limit rule.
 workers_dev = false
+
+# Settings below are kept from the dashboard on each deploy:
+#   CANONICAL_URL   main address, e.g. https://example.com/cast/
+#   REDIRECT_HOSTS  old hostnames that redirect to CANONICAL_URL (comma-separated)
+#   JOIN_ADDRESS    short address shown on the room screen, e.g. example.com/join
+keep_vars = true
 
 # Bundle the files in public/ into the Worker as text
 rules = [{ type = "Text", globs = ["**/*.html", "**/*.css", "**/public/*.js", "**/public/**/*.js"], fallthrough = false }]
@@ -29,9 +31,3 @@ new_sqlite_classes = ["SignalingServer"]
 # Secrets (set with `npx wrangler secret put <NAME>`):
 #   CLOUDFLARE_TURN_KEY_ID
 #   CLOUDFLARE_TURN_API_TOKEN
-
-[vars]
-CANONICAL_URL = "https://rotmanav.ca/cast/"
-REDIRECT_HOSTS = "share.rotmanav.ca"
-# Shown on the room screen as the address presenters type
-JOIN_ADDRESS = "rotmanav.ca/join"

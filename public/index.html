@@ -71,6 +71,7 @@
 
         <div id="media-container">
             <video id="remote-video" playsinline></video>
+            <div id="split-grid" hidden></div>
 
             <div class="viewing-controls" id="viewing-controls">
                 <div class="viewing-info">
@@ -81,6 +82,9 @@
                 </div>
                 <button class="btn btn-small" id="unmute-btn" data-action="unmute" hidden>
                     <i data-lucide="volume-x"></i> Turn on sound
+                </button>
+                <button class="btn btn-ghost btn-small" id="split-btn" data-action="toggle-split" hidden>
+                    <i data-lucide="columns-2"></i> <span class="split-label">Side by side</span>
                 </button>
                 <button class="btn btn-ghost btn-small" id="switch-presenter-btn" data-action="toggle-peer-panel" hidden>
                     <i data-lucide="users"></i> Switch

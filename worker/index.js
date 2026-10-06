@@ -46,14 +46,14 @@ function json(data, init = {}) {
     });
 }
 
-// The app can also be served from a folder, e.g. rotmanav.ca/cast/
+// The app can also be served from a folder, e.g. example.com/cast/
 const BASE_PREFIX = '/cast';
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
-        // Short presenter address, e.g. rotmanav.ca/join -> rotmanav.ca/cast/join
+        // Short presenter address, e.g. example.com/join -> example.com/cast/join
         if ((url.pathname === '/join' || url.pathname === '/join/') && env.CANONICAL_URL &&
             url.hostname === new URL(env.CANONICAL_URL).hostname) {
             return Response.redirect(env.CANONICAL_URL + 'join' + url.search, 302);

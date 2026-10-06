@@ -1,4 +1,4 @@
-# .dockerignore for QuickShare Hub
+# .dockerignore for QuickShare
 
 # Node.js
 node_modules

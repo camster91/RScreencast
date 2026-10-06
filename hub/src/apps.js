@@ -1,4 +1,4 @@
-// Apps listed on the rotmanav.ca home page, in this order.
+// Apps listed on the home page, in this order.
 // Icons are Lucide (https://lucide.dev, ISC license) SVG bodies.
 // hidden: true keeps an app off the page (e.g. while it is offline).
 export const APPS = [

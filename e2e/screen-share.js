@@ -290,6 +290,49 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         await host.waitForFunction(PARTICIPANTS_ZERO, null, { timeout: 10000 });
     });
 
+    await t.test('two presenters can be shown side by side', async () => {
+        const join = async (name) => {
+            const p = await newPresenter(code);
+            await p.fill('#presenter-name', name);
+            await p.click('#join-btn');
+            await approveNext(host);
+            await p.click('#select-screen-btn');
+            await p.waitForSelector('#share-live', { state: 'visible', timeout: 15000 });
+            return p;
+        };
+        const ann = await join('Ann');
+        await host.waitForSelector('#media-container', { state: 'visible', timeout: 15000 });
+        const bob = await join('Bob');
+        await host.mouse.move(300, 300);
+        await host.waitForSelector('#split-btn:not([hidden])', { timeout: 15000 });
+
+        await host.click('#split-btn');
+        await host.waitForFunction(() => document.querySelectorAll('#split-grid .tile').length === 2);
+        const labels = await host.locator('#split-grid .tile-label').allInnerTexts();
+        assert.deepStrictEqual(labels.map(l => l.split(' · ')[0]).sort(), ['Ann', 'Bob']);
+        await host.waitForFunction(() => [...document.querySelectorAll('#split-grid video')].every(v => v.readyState >= 2));
+        assert.ok(!(await host.locator('#remote-video').isVisible()), 'single view hidden');
+
+        // Clicking a screen shows just that presenter
+        await host.locator('#split-grid .tile', { hasText: 'Bob' }).click({ position: { x: 40, y: 40 } });
+        await host.waitForSelector('#split-grid', { state: 'hidden' });
+        assert.match(await host.locator('#viewing-name').innerText(), /^Bob/);
+
+        // End one presenter's share from their tile
+        await host.mouse.move(310, 310);
+        await host.click('#split-btn');
+        await host.locator('#split-grid .tile', { hasText: 'Ann' }).locator('[data-action="end-tile"]').click();
+        await ann.waitForSelector('#share-ended', { state: 'visible', timeout: 10000 });
+        await host.waitForSelector('#split-grid', { state: 'hidden', timeout: 10000 });
+        assert.ok(await host.locator('#remote-video').isVisible(), 'back to one screen');
+
+        await ann.context().close();
+        await bob.context().close();
+        await host.evaluate(() => [...connectedPeers.keys()].forEach(kickPeer));
+        await host.waitForFunction(PARTICIPANTS_ZERO, null, { timeout: 10000 });
+        await host.waitForSelector('#room-pc-setup', { state: 'visible', timeout: 10000 });
+    });
+
     await t.test('security headers are sent', async () => {
         const res = await fetch(`${BASE}/`);
         assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);

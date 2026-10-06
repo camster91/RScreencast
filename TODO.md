@@ -10,20 +10,20 @@
 
 - [ ] Turn on branch protection for `main`
 - [ ] Re-enable the Codex review bot (out of credits) or remove it
-- [ ] Show several presenters side by side
 
 ## Done
 
+- [x] Side by side: 2-4 presenters on the room screen at once
 - [x] Optional room PIN: presenters with the PIN go straight in (3 tries each, 10 wrong a minute per room)
 - [x] Connection quality (good / weak / poor) on the room screen and the presenter's laptop
 - [x] Presenters can type their name (shown next to the check code)
 - [x] Cast is open to guests (no login); the room screen still accepts each presenter
-- [x] Booking on the rotmanav.ca hub; Mics hidden until it is back online
+- [x] Booking on the hub page; Mics hidden until it is back online
 - [x] Hub source saved in `hub/`; CI tests the Cloudflare Worker too
 - [x] Rate limiting and `TRUST_PROXY` on the Node.js server
 - [x] Self-hosted signaling on Cloudflare (Durable Object) and Node.js
 - [x] Cloudflare TURN relay with short-lived credentials
-- [x] Live at rotmanav.ca/cast (share.rotmanav.ca redirects), auto-deploys from `main`
+- [x] Live on Cloudflare (old subdomain redirects), auto-deploys from `main`
 - [x] Rate limit, HSTS and security headers; workers.dev turned off
 - [x] Presenter check code, room lock, host approval
 - [x] Reconnects on its own; room code survives reloads

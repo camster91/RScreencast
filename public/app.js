@@ -5,7 +5,7 @@ const rawRoomId = params.get('room');
 const BASE_PATH = window.location.pathname.replace(/[^/]*$/, '');
 // Presenters type ".../join"; ?mode=join is the older address
 const isJoinMode = /\/join$/.test(window.location.pathname) || params.get('mode') === 'join';
-// Address shown to presenters; /config can give a shorter one (e.g. rotmanav.ca/join)
+// Address shown to presenters; /config can give a shorter one (e.g. example.com/join)
 const JOIN_ADDRESS = window.location.host + BASE_PATH + 'join';
 
 // Validate room code format - only allow alphanumeric, max 10 chars
@@ -797,6 +797,7 @@ function updatePeerList() {
     peopleBtn.querySelector('.participants-label').innerText = count ? `People · ${count}` : 'People';
     updatePendingBadge();
     updateViewingInfo();
+    renderSplit();
     renderIcons();
 }
 
@@ -930,7 +931,10 @@ function stopViewing() {
 
 // "End share" on the room screen: stop the presenter's share and tell them
 function endViewedShare() {
-    const peerId = currentViewingPeer;
+    endShareFor(currentViewingPeer);
+}
+
+function endShareFor(peerId) {
     const peerData = peerId && connectedPeers.get(peerId);
     if (!peerData || !peerData.call) {
         stopViewing();
@@ -939,6 +943,88 @@ function endViewedShare() {
     try { peerData.conn.send({ type: 'share-ended' }); } catch (e) { console.warn('Send failed:', e); }
     endCall(peerId, peerData.call);
 }
+
+// ---------- Side by side ----------
+// With 2-4 presenters sharing, show them in a grid. Tiles are muted: sound
+// still comes from the main (hidden) video of the presenter in focus, so
+// "Turn on sound" keeps working. Clicking a tile shows that presenter alone.
+const MAX_TILES = 4;
+let splitView = false;
+
+function sharingPeers() {
+    return [...connectedPeers].filter(([, data]) => data.stream).slice(0, MAX_TILES);
+}
+
+function toggleSplit() {
+    splitView = !splitView;
+    renderSplit();
+    wakeControls();
+}
+
+function renderSplit() {
+    const grid = document.getElementById('split-grid');
+    const sharing = sharingPeers();
+    const on = splitView && !!currentViewingPeer && sharing.length >= 2;
+
+    const splitBtn = document.getElementById('split-btn');
+    splitBtn.hidden = !currentViewingPeer || sharing.length < 2;
+    splitBtn.querySelector('.split-label').innerText = on ? 'One at a time' : 'Side by side';
+    document.getElementById('remote-video').hidden = on;
+    document.querySelector('#viewing-controls [data-action="stop-viewing"]').hidden = on;
+    grid.hidden = !on;
+    if (!on) {
+        grid.replaceChildren();
+        return;
+    }
+
+    grid.dataset.count = sharing.length;
+    const wanted = new Set(sharing.map(([peerId]) => peerId));
+    grid.querySelectorAll('.tile').forEach((tile) => {
+        if (!wanted.has(tile.dataset.peerId)) tile.remove();
+    });
+    for (const [peerId, data] of sharing) {
+        let tile = [...grid.children].find(t => t.dataset.peerId === peerId);
+        if (!tile) {
+            tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.dataset.peerId = peerId;
+            tile.dataset.action = 'focus-tile';
+            const video = document.createElement('video');
+            video.playsInline = true;
+            video.muted = true;
+            const label = document.createElement('span');
+            label.className = 'tile-label';
+            const end = document.createElement('button');
+            end.className = 'btn btn-danger btn-small tile-end';
+            end.dataset.action = 'end-tile';
+            end.dataset.peerId = peerId;
+            end.innerHTML = '<i data-lucide="square"></i> End';
+            tile.append(video, label, end);
+            grid.append(tile);
+        }
+        const video = tile.querySelector('video');
+        if (video.srcObject !== data.stream) {
+            video.srcObject = data.stream;
+            video.play().catch(() => {});
+        }
+        tile.querySelector('.tile-label').innerText = data.name;
+        tile.classList.toggle('current', peerId === currentViewingPeer);
+    }
+    renderIcons(grid);
+}
+
+document.getElementById('split-grid').addEventListener('click', (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    event.stopPropagation();
+    const peerId = target.dataset.peerId;
+    if (target.dataset.action === 'end-tile') {
+        endShareFor(peerId);
+    } else if (target.dataset.action === 'focus-tile') {
+        splitView = false;
+        viewPeer(peerId);
+    }
+});
 
 // Controls over the shared screen fade out until the mouse moves
 let controlsTimer = null;
@@ -1329,6 +1415,7 @@ const ACTIONS = {
     'room-pin': openPinSettings,
     'close-pin': closePinSettings,
     'stop-viewing': endViewedShare,
+    'toggle-split': toggleSplit,
     'unmute': unmuteVideo,
     'send-link': sendLink,
     'start-sharing': startSharing,

@@ -1,8 +1,8 @@
 {
-  "name": "rotmanav-hub",
+  "name": "hub",
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy --name"
   }
 }
