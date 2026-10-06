@@ -5,6 +5,7 @@ const rawRoomId = params.get('room');
 const BASE_PATH = window.location.pathname.replace(/[^/]*$/, '');
 // Presenters type ".../join"; ?mode=join is the older address
 const isJoinMode = /\/join$/.test(window.location.pathname) || params.get('mode') === 'join';
+// Address shown to presenters; /config can give a shorter one (e.g. rotmanav.ca/join)
 const JOIN_ADDRESS = window.location.host + BASE_PATH + 'join';
 
 // Validate room code format - only allow alphanumeric, max 10 chars
@@ -233,7 +234,7 @@ if (roomId) {
     document.getElementById('target-room-text').innerText = roomId;
     document.getElementById('share-supported').hidden = !canShareScreen;
     document.getElementById('share-unsupported').hidden = canShareScreen;
-    document.querySelectorAll('.join-address-text').forEach(el => { el.innerText = JOIN_ADDRESS; });
+    showJoinAddress(JOIN_ADDRESS);
     document.querySelectorAll('.room-code-text').forEach(el => { el.innerText = roomId; });
     showView('client-view');
 } else if (isJoinMode) {
@@ -242,13 +243,16 @@ if (roomId) {
     showView('manual-join-view');
     document.getElementById('manual-input').focus();
 } else {
-    document.getElementById('join-address').innerText = JOIN_ADDRESS;
+    showJoinAddress(JOIN_ADDRESS);
     if (!document.fullscreenEnabled) document.getElementById('fullscreen-btn').hidden = true;
     showView('room-view');
 }
 
 if (isHosting || roomId) {
     loadConfig().then((config) => {
+        if (typeof config.joinAddress === 'string' && /^[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(config.joinAddress)) {
+            showJoinAddress(config.joinAddress);
+        }
         peerOptions = buildPeerOptions(config);
         createPeer(hostRoomCode);
     });
@@ -282,6 +286,11 @@ async function refreshIceServers() {
     const iceServers = buildPeerOptions(config).config.iceServers;
     peerOptions.config.iceServers = iceServers;
     if (peer && peer.options.config) peer.options.config.iceServers = iceServers;
+}
+
+function showJoinAddress(address) {
+    document.getElementById('join-address').innerText = address;
+    document.querySelectorAll('.join-address-text').forEach(el => { el.innerText = address; });
 }
 
 function showView(id) {
