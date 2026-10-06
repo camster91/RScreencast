@@ -245,6 +245,51 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         assert.match(await host.locator('#floating-controls .lock-room-btn').innerText(), /Lock room/);
     });
 
+    await t.test('room PIN lets presenters in without Accept', async () => {
+        await host.click('#pin-btn');
+        await host.fill('#pin-setting', '12');
+        await host.click('#pin-save');
+        assert.match(await host.locator('#pin-setting-error').innerText(), /4 to 8 digits/);
+        await host.fill('#pin-setting', '2468');
+        await host.click('#pin-save');
+        assert.match(await host.locator('#pin-btn').innerText(), /PIN on/);
+        assert.match(await host.locator('#step3-label').innerText(), /room PIN/);
+
+        // Wrong PIN, then the right one
+        const p = await newPresenter(code);
+        await p.click('#join-btn');
+        await p.waitForSelector('#share-pin', { state: 'visible', timeout: 15000 });
+        await p.fill('#pin-entry', '1111');
+        await p.press('#pin-entry', 'Enter');
+        await p.waitForFunction(() => /isn't right\. 2 tries left/.test(document.getElementById('pin-message').innerText));
+        await p.fill('#pin-entry', '2468');
+        await p.click('#pin-submit');
+        await p.waitForSelector('#share-approved', { state: 'visible', timeout: 10000 });
+        assert.ok(!(await host.locator('#approval-modal.active').count()), 'no Accept needed');
+
+        // Three wrong PINs and you're out
+        const q = await newPresenter(code);
+        await q.click('#join-btn');
+        for (const wrong of ['1', '2', '3']) {
+            await q.waitForSelector('#share-pin', { state: 'visible', timeout: 15000 });
+            await q.waitForFunction(() => !document.getElementById('pin-submit').disabled);
+            await q.fill('#pin-entry', wrong.repeat(4));
+            await q.click('#pin-submit');
+        }
+        await q.waitForSelector('#share-denied', { state: 'visible', timeout: 10000 });
+        assert.match(await q.locator('#denied-message').innerText(), /PIN/);
+
+        // Turn the PIN off again and clear the room for the next tests
+        await host.click('#pin-btn');
+        await host.fill('#pin-setting', '');
+        await host.click('#pin-save');
+        assert.match(await host.locator('#pin-btn').innerText(), /Room PIN/);
+        await p.context().close();
+        await q.context().close();
+        await host.evaluate(() => [...connectedPeers.keys()].forEach(kickPeer));
+        await host.waitForFunction(PARTICIPANTS_ZERO, null, { timeout: 10000 });
+    });
+
     await t.test('security headers are sent', async () => {
         const res = await fetch(`${BASE}/`);
         assert.match(res.headers.get('content-security-policy') || '', /script-src 'self'/);

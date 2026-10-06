@@ -19,6 +19,9 @@
         <header class="topbar" id="floating-controls">
             <div class="brand"><span class="brand-mark"><i data-lucide="monitor"></i></span> Cast</div>
             <div class="topbar-actions">
+                <button class="btn btn-ghost btn-small pin-btn" data-action="room-pin" id="pin-btn" title="Let presenters in with a PIN">
+                    <i data-lucide="key-round"></i> <span class="pin-label">Room PIN</span>
+                </button>
                 <button class="btn btn-ghost btn-small lock-room-btn" data-action="toggle-room-lock" title="Stop new requests">
                     <i data-lucide="lock-open"></i> <span class="lock-label">Lock room</span>
                 </button>
@@ -54,7 +57,7 @@
                     <li>
                         <span class="step-num">3</span>
                         <div>
-                            <div class="step-label">Accept the request on this screen</div>
+                            <div class="step-label" id="step3-label">Accept the request on this screen</div>
                         </div>
                     </li>
                 </ol>
@@ -198,6 +201,19 @@
                 </button>
             </div>
 
+            <div id="share-pin" hidden>
+                <div class="card-icon"><i data-lucide="key-round"></i></div>
+                <h2>Enter the room PIN</h2>
+                <p class="muted" id="pin-message">Ask staff, or check the sign in the room.</p>
+                <form id="pin-form" novalidate>
+                    <input type="text" id="pin-entry" inputmode="numeric" autocomplete="off" maxlength="8"
+                        placeholder="••••" aria-label="Room PIN" enterkeyhint="go">
+                    <button type="submit" class="btn btn-full" id="pin-submit">
+                        Continue <i data-lucide="arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+
             <div id="share-denied" hidden>
                 <div class="card-icon danger"><i data-lucide="x-circle"></i></div>
                 <h2>Not accepted</h2>
@@ -241,6 +257,22 @@
                 <button class="btn" data-action="approve">Accept</button>
             </div>
         </div>
+    </div>
+
+    <!-- ROOM PIN SETTINGS -->
+    <div class="modal-overlay" id="pin-modal" role="dialog" aria-modal="true" aria-labelledby="pin-title">
+        <form class="modal" id="pin-settings-form" novalidate>
+            <h3 id="pin-title">Room PIN</h3>
+            <p class="muted pin-help">Presenters who enter this PIN go straight in, without anyone pressing Accept.
+                Put it on a sign in the room or tell people. Leave it empty to turn it off.</p>
+            <input type="text" id="pin-setting" inputmode="numeric" autocomplete="off" maxlength="8"
+                placeholder="4 to 8 digits" aria-label="Room PIN">
+            <div class="field-error" id="pin-setting-error" role="alert" hidden></div>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-ghost" data-action="close-pin">Cancel</button>
+                <button type="submit" class="btn" id="pin-save">Save</button>
+            </div>
+        </form>
     </div>
 
     <div class="toast" id="toast" role="status" hidden></div>
