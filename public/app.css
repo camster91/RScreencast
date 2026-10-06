@@ -450,6 +450,16 @@ input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-so
 }
 #presenter-count { color: var(--text-dim); font-weight: 500; }
 
+/* Connection quality */
+.quality { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.quality::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.quality.good { color: var(--live); }
+.quality.weak { color: var(--warning); }
+.quality.poor { color: var(--danger); }
+.viewing-info .quality { margin-left: 4px; }
+.quality-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: -0.5rem 0 1.25rem; }
+.quality-tip { font-size: 0.85rem; color: var(--text-dim); }
+
 /* People panel */
 #peer-panel {
     position: fixed;

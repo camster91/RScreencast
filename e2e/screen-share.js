@@ -154,6 +154,21 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         assert.ok(await host.locator('#unmute-btn').isVisible(), 'unmute button shown');
     });
 
+    await t.test('both screens show the connection quality', async () => {
+        await host.waitForSelector('#host-quality:not([hidden])', { timeout: 15000 });
+        assert.match(await host.locator('#host-quality').innerText(), /Good connection/);
+        await presenter.waitForSelector('#client-quality-row:not([hidden])', { timeout: 15000 });
+        assert.match(await presenter.locator('#client-quality').innerText(), /Good connection/);
+        const levels = await host.evaluate(() => [
+            classifyQuality({ loss: 0, rtt: 0.02 }),
+            classifyQuality({ loss: 0.05, rtt: 0.02 }),
+            classifyQuality({ loss: 0, rtt: 0.3 }),
+            classifyQuality({ loss: 0.1, rtt: 0.02 }),
+            classifyQuality({ loss: 0, rtt: 0.8 })
+        ]);
+        assert.deepStrictEqual(levels, ['good', 'weak', 'weak', 'poor', 'poor']);
+    });
+
     await t.test('tap for sound unmutes', async () => {
         await host.evaluate(() => { window.__soundUnlocked = true; });
         await host.click('#unmute-btn');

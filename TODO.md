@@ -12,10 +12,10 @@
 - [ ] Re-enable the Codex review bot (out of credits) or remove it
 - [ ] Optional room password
 - [ ] Show several presenters side by side
-- [ ] Connection quality indicator
 
 ## Done
 
+- [x] Connection quality (good / weak / poor) on the room screen and the presenter's laptop
 - [x] Presenters can type their name (shown next to the check code)
 - [x] Cast is open to guests (no login); the room screen still accepts each presenter
 - [x] Booking on the rotmanav.ca hub; Mics hidden until it is back online

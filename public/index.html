@@ -74,6 +74,7 @@
                     <span class="live-dot"></span>
                     <span id="viewing-name">-</span>
                     <span id="presenter-count"></span>
+                    <span class="quality" id="host-quality" hidden></span>
                 </div>
                 <button class="btn btn-small" id="unmute-btn" data-action="unmute" hidden>
                     <i data-lucide="volume-x"></i> Turn on sound
@@ -174,6 +175,10 @@
                 <div class="live-badge"><span class="live-dot"></span> Live</div>
                 <h2>You're on the room screen</h2>
                 <p class="muted">Everyone in the room can see what you're sharing.</p>
+                <div class="quality-row" id="client-quality-row" hidden>
+                    <span class="quality" id="client-quality"></span>
+                    <span class="quality-tip" id="client-quality-tip"></span>
+                </div>
                 <div class="button-group">
                     <button class="btn btn-ghost" data-action="share-screen">
                         <i data-lucide="refresh-cw"></i> Switch
