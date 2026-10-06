@@ -1,0 +1,16 @@
+# rotmanav.ca home page. Deploy from this folder: npx wrangler deploy
+name = "rotmanav-hub"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+account_id = "be5629964da6a37742ab021584b224d8"
+workers_dev = false
+
+# Catch-all for the main site. More specific routes (/cast*, /clicker*,
+# /book, /book/*) belong to other Workers and win over these.
+routes = [
+  { pattern = "rotmanav.ca/*", zone_name = "rotmanav.ca" },
+  { pattern = "www.rotmanav.ca/*", zone_name = "rotmanav.ca" },
+  { pattern = "app.rotmanav.ca/*", zone_name = "rotmanav.ca" },
+  { pattern = "ai.rotmanav.ca/*", zone_name = "rotmanav.ca" },
+  { pattern = "admin.rotmanav.ca/*", zone_name = "rotmanav.ca" }
+]
