@@ -2,13 +2,9 @@
 
 ## Next up
 
-- [ ] Merge PR #20 (UX polish). Merging to `main` deploys to rotmanav.ca/cast
 - [ ] Live test with two real devices: room PC + laptop, on the office Wi-Fi and on a guest network (checks the TURN relay)
 - [ ] Test on the actual room TV: text size, QR scan distance, sound
-- [ ] Decide who can open Cast. Today it is behind the staff login (Cloudflare Access), so guests can't present
-- [ ] Fix the other rotmanav.ca addresses that show Cloudflare "error 1000" (DNS records point at Cloudflare IPs)
-- [ ] Add Booking (`/book`) to the rotmanav.ca hub page
-- [ ] Put the hub's code in its own GitHub repo (it only exists as a deployed Worker today)
+- [ ] Move `hub/` into its own GitHub repo and turn on auto-deploy
 
 ## Later (optional)
 
@@ -21,6 +17,10 @@
 
 ## Done
 
+- [x] Cast is open to guests (no login); the room screen still accepts each presenter
+- [x] Booking on the rotmanav.ca hub; Mics hidden until it is back online
+- [x] Hub source saved in `hub/`; CI tests the Cloudflare Worker too
+- [x] Rate limiting and `TRUST_PROXY` on the Node.js server
 - [x] Self-hosted signaling on Cloudflare (Durable Object) and Node.js
 - [x] Cloudflare TURN relay with short-lived credentials
 - [x] Live at rotmanav.ca/cast (share.rotmanav.ca redirects), auto-deploys from `main`
