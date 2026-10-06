@@ -10,13 +10,13 @@
 
 - [ ] Turn on branch protection for `main`
 - [ ] Re-enable the Codex review bot (out of credits) or remove it
-- [ ] Presenters can type their name (shown on the room screen)
 - [ ] Optional room password
 - [ ] Show several presenters side by side
 - [ ] Connection quality indicator
 
 ## Done
 
+- [x] Presenters can type their name (shown next to the check code)
 - [x] Cast is open to guests (no login); the room screen still accepts each presenter
 - [x] Booking on the rotmanav.ca hub; Mics hidden until it is back online
 - [x] Hub source saved in `hub/`; CI tests the Cloudflare Worker too

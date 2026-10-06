@@ -12,7 +12,7 @@ Meeting rooms often need a way for guests to put their screen on the room displa
 
 - **Host mode (room PC)**: generates a 5-character room code that survives reloads, shows a QR code, displays the shared screen full-screen and keeps the display awake (Screen Wake Lock)
 - **Join mode (presenter)**: go to `rotmanav.ca/join` (shown on the room screen; it forwards to `/cast/join`) and type the code, or scan the QR code, ask to share, then choose a screen, window or tab. Phones are told up front to use a computer and can send the link to it
-- **Host approval**: presenters can only share after someone at the room screen clicks Accept. A 4-character check code is shown on both screens so the host can confirm who is asking
+- **Host approval**: presenters can only share after someone at the room screen clicks Accept. A 4-character check code is shown on both screens so the host can confirm who is asking. Presenters can type their name; it is always shown next to the check code
 - **Several presenters**: multiple people can join; the room screen switches between them, ends a share, removes people, or locks the room to new requests. Controls fade out while a screen is shown
 - **Self-healing connections**: reconnects on its own when the network or signaling server drops, and cleans up presenters who leave, crash or go offline
 - **Two server options from one codebase**: a Cloudflare Worker with signaling in a Durable Object, or a Node.js/Express server with a PeerJS signaling server (also packaged as a Docker image)

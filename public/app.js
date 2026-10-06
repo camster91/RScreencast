@@ -504,11 +504,12 @@ function handlePeerMessage(conn, data) {
             return;
         }
 
-        // Add to connected peers as pending. The name comes from the peer ID,
-        // not from the request, so a presenter can't pose as "IT Support".
+        // Add to connected peers as pending. A typed name is only a label:
+        // the check code (from the peer ID) is always shown next to it, so
+        // someone calling themselves "IT Support" can still be checked.
         connectedPeers.set(conn.peer, {
             conn: conn,
-            name: presenterName(conn.peer),
+            name: presenterName(conn.peer, data.name),
             approved: false,
             stream: null,
             call: null
@@ -533,8 +534,21 @@ function presenterCode(peerId) {
     return String(peerId).replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
 }
 
-function presenterName(peerId) {
-    return 'Presenter ' + presenterCode(peerId);
+// Presenter's typed name, cleaned: no control or text-direction characters
+// (which could hide or reorder the code), single spaces, max 30 characters
+function cleanName(name) {
+    if (typeof name !== 'string') return '';
+    return name
+        .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 30)
+        .trim();
+}
+
+function presenterName(peerId, typedName) {
+    const name = cleanName(typedName);
+    return name ? name + ' · ' + presenterCode(peerId) : 'Presenter ' + presenterCode(peerId);
 }
 
 function toggleRoomLock() {
@@ -863,6 +877,13 @@ function waitForPeerOpen(timeoutMs) {
     });
 }
 
+// The presenter's name is remembered on this device for next time
+function getPresenterName() {
+    const name = document.getElementById('presenter-name').value;
+    try { localStorage.setItem('cast-presenter-name', name); } catch (e) { /* storage blocked */ }
+    return name;
+}
+
 async function startSharing() {
     document.getElementById('join-btn').disabled = true;
     try {
@@ -892,7 +913,7 @@ async function startSharing() {
         clearTimeout(openTimeout);
         // No timeout after this: the host may take a while to click Allow,
         // and 'close' tells us if they leave.
-        conn.send({ type: 'join-request' });
+        conn.send({ type: 'join-request', name: cleanName(getPresenterName()) });
     });
 
     conn.on('data', (data) => {
@@ -1065,4 +1086,11 @@ document.addEventListener('click', (event) => {
 });
 
 document.getElementById('manual-input').addEventListener('input', cleanJoinInput);
+
+// Presenter's name: fill in last time's, and Enter asks to share
+const nameInput = document.getElementById('presenter-name');
+try { nameInput.value = localStorage.getItem('cast-presenter-name') || ''; } catch (e) { /* storage blocked */ }
+nameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !document.getElementById('join-btn').disabled) startSharing();
+});
 document.getElementById('join-form').addEventListener('submit', submitJoin);
