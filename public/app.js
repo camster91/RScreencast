@@ -499,7 +499,8 @@ function handlePeerMessage(conn, data) {
             return;
         }
 
-        if (pendingApprovals.length >= MAX_PENDING_APPROVALS) {
+        const waiting = [...connectedPeers.values()].filter(p => !p.approved).length;
+        if (waiting >= MAX_PENDING_APPROVALS) {
             sendThenClose(conn, { type: 'denied' });
             return;
         }
@@ -507,19 +508,31 @@ function handlePeerMessage(conn, data) {
         // Add to connected peers as pending. A typed name is only a label:
         // the check code (from the peer ID) is always shown next to it, so
         // someone calling themselves "IT Support" can still be checked.
-        connectedPeers.set(conn.peer, {
+        const peerData = {
             conn: conn,
             name: presenterName(conn.peer, data.name),
             approved: false,
             stream: null,
             call: null
-        });
+        };
+        connectedPeers.set(conn.peer, peerData);
+
+        // With a room PIN, the presenter lets themselves in
+        if (roomPin) {
+            peerData.awaitingPin = true;
+            peerData.pinTries = 0;
+            conn.send({ type: 'pin-required' });
+            updatePeerList();
+            return;
+        }
 
         // Add to pending approvals and show dialog
         pendingApprovals.push(conn.peer);
         updatePendingBadge();
         showNextApproval();
         updatePeerList();
+    } else if (data.type === 'pin') {
+        if (existing && existing.awaitingPin) checkPin(conn.peer, existing, data.pin);
     } else if (data.type === 'stopped-sharing') {
         if (existing && existing.call && existing.call.connectionId === data.callId) {
             endCall(conn.peer, existing.call);
@@ -551,6 +564,100 @@ function presenterName(peerId, typedName) {
     return name ? name + ' · ' + presenterCode(peerId) : 'Presenter ' + presenterCode(peerId);
 }
 
+// ---------- Room PIN ----------
+// Kept on this PC, so it survives restarts. Wrong guesses are limited per
+// presenter (3) and for the whole room (10 a minute) so it can't be guessed.
+const PIN_TRIES = 3;
+const PIN_ROOM_FAILURES_PER_MINUTE = 10;
+let roomPin = '';
+let pinFailures = [];
+
+try {
+    const saved = localStorage.getItem('cast-room-pin') || '';
+    if (/^\d{4,8}$/.test(saved)) roomPin = saved;
+} catch (e) { /* storage blocked */ }
+
+function checkPin(peerId, peerData, pin) {
+    const now = Date.now();
+    pinFailures = pinFailures.filter(t => now - t < 60000);
+    if (pinFailures.length >= PIN_ROOM_FAILURES_PER_MINUTE) {
+        peerData.conn.send({ type: 'pin-required', retryLater: true });
+        return;
+    }
+    if (typeof pin === 'string' && pin === roomPin) {
+        peerData.awaitingPin = false;
+        peerData.approved = true;
+        peerData.conn.send({ type: 'approved' });
+        updatePeerList();
+        return;
+    }
+    pinFailures.push(now);
+    peerData.pinTries++;
+    if (peerData.pinTries >= PIN_TRIES) {
+        connectedPeers.delete(peerId);
+        sendThenClose(peerData.conn, { type: 'denied', reason: 'pin' });
+    } else {
+        peerData.conn.send({ type: 'pin-required', wrong: true, triesLeft: PIN_TRIES - peerData.pinTries });
+    }
+    updatePeerList();
+}
+
+function setRoomPin(pin) {
+    roomPin = pin;
+    try {
+        if (pin) localStorage.setItem('cast-room-pin', pin);
+        else localStorage.removeItem('cast-room-pin');
+    } catch (e) { /* storage blocked */ }
+    // Anyone still typing a PIN now waits for Accept instead
+    if (!pin) {
+        connectedPeers.forEach((peerData, peerId) => {
+            if (!peerData.awaitingPin) return;
+            peerData.awaitingPin = false;
+            peerData.conn.send({ type: 'waiting' });
+            pendingApprovals.push(peerId);
+        });
+        updatePendingBadge();
+        showNextApproval();
+    }
+    showPinState();
+    updatePeerList();
+}
+
+function showPinState() {
+    const btn = document.getElementById('pin-btn');
+    btn.classList.toggle('on', !!roomPin);
+    btn.querySelector('.pin-label').innerText = roomPin ? 'PIN on' : 'Room PIN';
+    document.getElementById('step3-label').innerText = roomPin
+        ? 'Enter the room PIN on your laptop'
+        : 'Accept the request on this screen';
+}
+
+function openPinSettings() {
+    const input = document.getElementById('pin-setting');
+    input.value = roomPin;
+    document.getElementById('pin-setting-error').hidden = true;
+    document.getElementById('pin-modal').classList.add('active');
+    input.focus();
+}
+
+function closePinSettings() {
+    document.getElementById('pin-modal').classList.remove('active');
+}
+
+function savePinSettings(event) {
+    event.preventDefault();
+    const pin = document.getElementById('pin-setting').value.trim();
+    const error = document.getElementById('pin-setting-error');
+    if (pin && !/^\d{4,8}$/.test(pin)) {
+        error.innerText = 'Use 4 to 8 digits.';
+        error.hidden = false;
+        return;
+    }
+    closePinSettings();
+    setRoomPin(pin);
+    showToast(pin ? 'Room PIN on. Presenters with the PIN go straight in.' : 'Room PIN off. Requests need Accept.');
+}
+
 function toggleRoomLock() {
     roomLocked = !roomLocked;
     // Locking also turns away anyone still waiting
@@ -561,6 +668,11 @@ function toggleRoomLock() {
             removePendingApproval(peerId);
             if (peerData) sendThenClose(peerData.conn, { type: 'denied', reason: 'locked' });
         }
+        connectedPeers.forEach((peerData, peerId) => {
+            if (!peerData.awaitingPin) return;
+            connectedPeers.delete(peerId);
+            sendThenClose(peerData.conn, { type: 'denied', reason: 'locked' });
+        });
         updatePeerList();
     }
     document.querySelectorAll('.lock-room-btn').forEach((btn) => {
@@ -647,7 +759,7 @@ function updatePeerList() {
 
         let statusText = 'Connected, not sharing';
         if (isPending) {
-            statusText = 'Waiting to be accepted';
+            statusText = data.awaitingPin ? 'Entering the PIN' : 'Waiting to be accepted';
         } else if (hasStream) {
             statusText = isActive ? 'On screen now' : 'Sharing · click to show';
         }
@@ -852,7 +964,7 @@ let clientConn = null;
 let clientDone = false; // reached a final state (denied, kicked, error)
 
 function showClientState(state) {
-    const states = ['share-initial', 'share-waiting', 'share-approved', 'share-live', 'share-ended', 'share-denied', 'share-kicked', 'share-error'];
+    const states = ['share-initial', 'share-waiting', 'share-pin', 'share-approved', 'share-live', 'share-ended', 'share-denied', 'share-kicked', 'share-error'];
     states.forEach(s => {
         document.getElementById(s).hidden = s !== state;
     });
@@ -878,6 +990,31 @@ function waitForPeerOpen(timeoutMs) {
             setTimeout(check, 200);
         })();
     });
+}
+
+// Room PIN: shown when the room asks for it, sent when the presenter submits
+function showPinEntry({ wrong, triesLeft, retryLater }) {
+    const message = document.getElementById('pin-message');
+    if (retryLater) {
+        message.innerText = 'Too many wrong PINs in this room. Wait a minute and try again.';
+    } else if (wrong) {
+        message.innerText = `That PIN isn't right. ${triesLeft} ${triesLeft === 1 ? 'try' : 'tries'} left.`;
+    } else {
+        message.innerText = 'Ask staff, or check the sign in the room.';
+    }
+    const input = document.getElementById('pin-entry');
+    input.value = '';
+    document.getElementById('pin-submit').disabled = false;
+    showClientState('share-pin');
+    input.focus();
+}
+
+function submitPin(event) {
+    event.preventDefault();
+    const pin = document.getElementById('pin-entry').value.replace(/\D/g, '');
+    if (!pin || !clientConn || !clientConn.open) return;
+    document.getElementById('pin-submit').disabled = true;
+    clientConn.send({ type: 'pin', pin });
 }
 
 // The presenter's name is remembered on this device for next time
@@ -925,12 +1062,19 @@ async function startSharing() {
 
         if (data.type === 'approved') {
             if (!currentStream) showClientState('share-approved');
+        } else if (data.type === 'pin-required') {
+            showPinEntry(data);
+        } else if (data.type === 'waiting') {
+            showClientState('share-waiting');
         } else if (data.type === 'denied') {
             clientDone = true;
             endShare(false);
             if (data.reason === 'locked') {
                 document.getElementById('denied-message').innerText =
                     'This room is locked right now. Ask someone at the room screen to unlock it.';
+            } else if (data.reason === 'pin') {
+                document.getElementById('denied-message').innerText =
+                    'That PIN wasn\'t right. Check the PIN with staff, then ask again.';
             }
             showClientState('share-denied');
         } else if (data.type === 'share-ended') {
@@ -1182,6 +1326,8 @@ function showClientQuality(level, details) {
 const ACTIONS = {
     'toggle-peer-panel': togglePeerPanel,
     'fullscreen': toggleFullscreen,
+    'room-pin': openPinSettings,
+    'close-pin': closePinSettings,
     'stop-viewing': endViewedShare,
     'unmute': unmuteVideo,
     'send-link': sendLink,
@@ -1209,3 +1355,9 @@ nameInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !document.getElementById('join-btn').disabled) startSharing();
 });
 document.getElementById('join-form').addEventListener('submit', submitJoin);
+document.getElementById('pin-form').addEventListener('submit', submitPin);
+document.getElementById('pin-settings-form').addEventListener('submit', savePinSettings);
+document.getElementById('pin-entry').addEventListener('input', (event) => {
+    event.target.value = event.target.value.replace(/\D/g, '').slice(0, 8);
+});
+if (isHosting) showPinState();
