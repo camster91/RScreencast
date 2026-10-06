@@ -131,12 +131,14 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
 
     const presenter = await newPresenter(code.toLowerCase());
 
-    await t.test('lowercase link works, codes match, and host can approve', async () => {
+    await t.test('lowercase link works, name and codes match, and host can approve', async () => {
+        await presenter.fill('#presenter-name', '  Sam   Lee ');
         await presenter.click('#join-btn');
         await host.waitForSelector('#approval-modal.active', { timeout: 15000 });
         const shown = await presenter.locator('#my-presenter-code').innerText();
         assert.match(shown, /^[A-Z0-9]{4}$/);
         assert.strictEqual(await host.locator('#requester-code').innerText(), shown);
+        assert.strictEqual(await host.locator('#requester-name').innerText(), `Sam Lee · ${shown}`);
         await host.click('[data-action="approve"]');
         await presenter.waitForSelector('#share-approved', { state: 'visible', timeout: 10000 });
     });
@@ -190,7 +192,7 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
         assert.ok(await host.locator('#room-pc-setup').isVisible());
     });
 
-    await t.test('denied presenter is told, and cannot choose their own name', async () => {
+    await t.test('denied presenter is told, and a fake name cannot hide the check code', async () => {
         const p = await newPresenter(code);
         // Wait for the page to connect before tampering with its connection
         await p.waitForFunction(() => typeof peer !== 'undefined' && peer && peer.open, null, { timeout: 15000 });
@@ -200,13 +202,17 @@ test('screen sharing end to end', { timeout: 300000 }, async (t) => {
             peer.connect = (...args) => {
                 const conn = realConnect(...args);
                 const realSend = conn.send.bind(conn);
-                conn.send = (data) => realSend(data && data.type === 'join-request' ? { ...data, name: 'IT Support' } : data);
+                // Text-direction and control characters could reorder or hide the code;
+        // they are removed, spaces collapsed and the name cut to 30 characters
+                const fake = '\u202EIT\u0000 Support' + ' '.repeat(40) + 'x'.repeat(40);
+                conn.send = (data) => realSend(data && data.type === 'join-request' ? { ...data, name: fake } : data);
                 return conn;
             };
         });
         await p.click('#join-btn');
         await host.waitForSelector('#approval-modal.active', { timeout: 15000 });
-        assert.match(await host.locator('#requester-name').innerText(), /^Presenter [A-Z0-9]{4}$/);
+        const checkCode = await host.locator('#requester-code').innerText();
+        assert.strictEqual(await host.locator('#requester-name').innerText(), `IT Support ${'x'.repeat(19)} · ${checkCode}`);
         await host.click('[data-action="deny"]');
         await p.waitForSelector('#share-denied', { state: 'visible', timeout: 5000 });
         await p.context().close();

@@ -179,6 +179,19 @@ input {
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 input::placeholder { color: rgba(255, 255, 255, 0.15); }
+
+/* Presenter's name: a normal text field, not a code box */
+input.name-input {
+    font-family: var(--font);
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: normal;
+    text-indent: 0;
+    text-transform: none;
+    text-align: left;
+    margin-bottom: 12px;
+}
+input.name-input::placeholder { color: var(--text-dim); opacity: 0.7; }
 input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); outline: none; }
 
 .field-error { color: var(--danger); font-size: 0.9rem; margin-top: 0.75rem; }
