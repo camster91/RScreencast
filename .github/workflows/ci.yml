@@ -68,7 +68,13 @@ jobs:
           npm run test:e2e
 
       # Same test against the Cloudflare Worker (the code that runs on rotmanav.ca/cast).
-      # Wrangler is pinned: older versions reject the compatibility date in wrangler.toml.
+      # Wrangler is pinned: older versions reject the compatibility date in wrangler.toml,
+      # and this one needs Node 22 (the server steps above stay on Node 20, like Docker).
+      - name: Setup Node.js 22 for Wrangler
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: End-to-end browser test (Cloudflare Worker)
         env:
           WRANGLER_SEND_METRICS: "false"
