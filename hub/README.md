@@ -6,7 +6,7 @@ It is a small Cloudflare Worker (`rotmanav-hub`) with no dependencies. Other Wor
 
 ## Add or change an app
 
-Edit `src/apps.js` (name, path, one-line description, Lucide icon, and `staffOnly: true` for a "Staff login" badge), then deploy.
+Edit `src/apps.js` (name, path, one-line description, Lucide icon, `staffOnly: true` for a "Staff login" badge, `hidden: true` to take it off the page), then deploy.
 
 ## Deploy
 

@@ -123,7 +123,7 @@ function page({ title, heading, intro, status = 200 }) {
             <h1>${escapeHtml(heading)}</h1>
             <p class="intro">${escapeHtml(intro)}</p>
         </header>
-        <nav class="apps" aria-label="Apps">${APPS.map(appCard).join("")}
+        <nav class="apps" aria-label="Apps">${APPS.filter((app) => !app.hidden).map(appCard).join("")}
         </nav>
         <footer>Rotman AV</footer>
     </main>

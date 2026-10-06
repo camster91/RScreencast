@@ -1,5 +1,6 @@
 // Apps listed on the rotmanav.ca home page, in this order.
 // Icons are Lucide (https://lucide.dev, ISC license) SVG bodies.
+// hidden: true keeps an app off the page (e.g. while it is offline).
 export const APPS = [
   {
     name: "Cast",
@@ -22,6 +23,7 @@ export const APPS = [
   {
     name: "Mics",
     path: "/mics/",
+    hidden: true, // not hosted anywhere right now; /mics/ would show "Page not found"
     description: "Microphone management.",
     staffOnly: true,
     icon: '<path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/>'
