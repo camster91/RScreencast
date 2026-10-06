@@ -1,4 +1,4 @@
-// rotmanav.ca home page: a list of the AV apps, plus a friendly 404.
+// rotmanav.ca home page: a list of the room tools, plus a friendly 404.
 // Other Workers own their paths (/cast, /clicker, /book); this one gets the rest.
 import { APPS } from "./apps.js";
 
@@ -125,7 +125,7 @@ function page({ title, heading, intro, status = 200 }) {
         </header>
         <nav class="apps" aria-label="Apps">${APPS.filter((app) => !app.hidden).map(appCard).join("")}
         </nav>
-        <footer>AV team</footer>
+        <footer>Room Tools</footer>
     </main>
 </body>
 </html>`;
@@ -145,8 +145,8 @@ export default {
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
     if (url.pathname === "/health") return new Response("OK");
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return page({ title: "AV apps", heading: "AV apps", intro: "Tools for rooms and events." });
+      return page({ title: "Room Tools", heading: "Room Tools", intro: "Tools for meeting rooms and events." });
     }
-    return page({ title: "Page not found · AV apps", heading: "Page not found", intro: "That page doesn’t exist. Try one of these:", status: 404 });
+    return page({ title: "Page not found · Room Tools", heading: "Page not found", intro: "That page doesn’t exist. Try one of these:", status: 404 });
   }
 };
