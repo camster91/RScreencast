@@ -1,4 +1,4 @@
-# Rotman Meeting Rooms - QuickShare Hub (WebRTC Signaling Server)
+# QuickShare (WebRTC Signaling Server)
 # Dockerfile for Coolify/Container Deployment
 
 # Use Node.js LTS Alpine for smaller image

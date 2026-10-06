@@ -67,7 +67,7 @@ jobs:
           npx playwright install --with-deps chromium
           npm run test:e2e
 
-      # Same test against the Cloudflare Worker (the code that runs on rotmanav.ca/cast).
+      # Same test against the Cloudflare Worker (the code that runs in production).
       # Wrangler is pinned: older versions reject the compatibility date in wrangler.toml,
       # and this one needs Node 22 (the server steps above stay on Node 20, like Docker).
       - name: Setup Node.js 22 for Wrangler

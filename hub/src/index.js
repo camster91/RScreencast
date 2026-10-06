@@ -1,8 +1,8 @@
-// rotmanav.ca home page: a list of the AV apps, plus a friendly 404.
+// Home page: a list of the apps, plus a friendly 404.
 // Other Workers own their paths (/cast, /clicker, /book); this one gets the rest.
+// SITE_NAME, SITE_INTRO and CANONICAL_HOST are set in the Cloudflare dashboard.
 import { APPS } from "./apps.js";
 
-const CANONICAL_HOST = "rotmanav.ca";
 const LOCK_ICON = '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
 const ARROW_ICON = '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>';
 const SECURITY_HEADERS = {
@@ -33,7 +33,7 @@ function appCard(app) {
         </a>`;
 }
 
-function page({ title, heading, intro, status = 200 }) {
+function page({ title, heading, intro, siteName, status = 200 }) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,7 +125,7 @@ function page({ title, heading, intro, status = 200 }) {
         </header>
         <nav class="apps" aria-label="Apps">${APPS.filter((app) => !app.hidden).map(appCard).join("")}
         </nav>
-        <footer>Rotman AV</footer>
+        <footer>${escapeHtml(siteName)}</footer>
     </main>
 </body>
 </html>`;
@@ -136,17 +136,19 @@ function page({ title, heading, intro, status = 200 }) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env = {}) {
     const url = new URL(request.url);
+    const host = env.CANONICAL_HOST;
+    const siteName = env.SITE_NAME || "Apps";
     // www, app, ai, admin... all go to the main address
-    if (url.hostname !== CANONICAL_HOST && url.hostname.endsWith(`.${CANONICAL_HOST}`)) {
-      return Response.redirect(`https://${CANONICAL_HOST}${url.pathname}${url.search}`, 301);
+    if (host && url.hostname !== host && url.hostname.endsWith(`.${host}`)) {
+      return Response.redirect(`https://${host}${url.pathname}${url.search}`, 301);
     }
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
     if (url.pathname === "/health") return new Response("OK");
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return page({ title: "Rotman AV", heading: "Rotman AV", intro: "Tools for Rotman rooms and events." });
+      return page({ title: siteName, heading: siteName, intro: env.SITE_INTRO || "Tools for rooms and events.", siteName });
     }
-    return page({ title: "Page not found · Rotman AV", heading: "Page not found", intro: "That page doesn’t exist. Try one of these:", status: 404 });
+    return page({ title: `Page not found · ${siteName}`, heading: "Page not found", siteName, intro: "That page doesn’t exist. Try one of these:", status: 404 });
   }
 };

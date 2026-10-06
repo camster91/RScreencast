@@ -5,7 +5,7 @@ const rawRoomId = params.get('room');
 const BASE_PATH = window.location.pathname.replace(/[^/]*$/, '');
 // Presenters type ".../join"; ?mode=join is the older address
 const isJoinMode = /\/join$/.test(window.location.pathname) || params.get('mode') === 'join';
-// Address shown to presenters; /config can give a shorter one (e.g. rotmanav.ca/join)
+// Address shown to presenters; /config can give a shorter one (e.g. example.com/join)
 const JOIN_ADDRESS = window.location.host + BASE_PATH + 'join';
 
 // Validate room code format - only allow alphanumeric, max 10 chars
