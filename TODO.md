@@ -10,10 +10,10 @@
 
 - [ ] Turn on branch protection for `main`
 - [ ] Re-enable the Codex review bot (out of credits) or remove it
-- [ ] Show several presenters side by side
 
 ## Done
 
+- [x] Side by side: 2-4 presenters on the room screen at once
 - [x] Optional room PIN: presenters with the PIN go straight in (3 tries each, 10 wrong a minute per room)
 - [x] Connection quality (good / weak / poor) on the room screen and the presenter's laptop
 - [x] Presenters can type their name (shown next to the check code)
