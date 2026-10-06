@@ -9,6 +9,8 @@ account_id = "be5629964da6a37742ab021584b224d8"
 routes = [
   # Wildcard so /cast?room=CODE (QR links) also matches
   { pattern = "rotmanav.ca/cast*", zone_name = "rotmanav.ca" },
+  # Short address for presenters; redirects to /cast/join
+  { pattern = "rotmanav.ca/join*", zone_name = "rotmanav.ca" },
   { pattern = "share.rotmanav.ca", custom_domain = true }
 ]
 workers_dev = false
@@ -31,3 +33,5 @@ new_sqlite_classes = ["SignalingServer"]
 [vars]
 CANONICAL_URL = "https://rotmanav.ca/cast/"
 REDIRECT_HOSTS = "share.rotmanav.ca"
+# Shown on the room screen as the address presenters type
+JOIN_ADDRESS = "rotmanav.ca/join"

@@ -53,6 +53,12 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
+        // Short presenter address, e.g. rotmanav.ca/join -> rotmanav.ca/cast/join
+        if ((url.pathname === '/join' || url.pathname === '/join/') && env.CANONICAL_URL &&
+            url.hostname === new URL(env.CANONICAL_URL).hostname) {
+            return Response.redirect(env.CANONICAL_URL + 'join' + url.search, 302);
+        }
+
         if (url.pathname === BASE_PREFIX) {
             return Response.redirect(`${url.origin}${BASE_PREFIX}/${url.search}`, 301);
         }
@@ -87,6 +93,7 @@ export default {
             }
             return json({
                 peerServer: 'self',
+                joinAddress: env.JOIN_ADDRESS || undefined,
                 iceServers: await getTurnServers(env),
                 debug: env.PEERJS_DEBUG === 'true'
             });
