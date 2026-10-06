@@ -744,6 +744,7 @@ function viewPeer(peerId) {
         playRemoteVideo();
     }
 
+    monitorViewedCall();
     updatePeerList();
 }
 
@@ -811,6 +812,7 @@ function stopViewing() {
     document.getElementById('media-container').style.display = 'none';
     document.getElementById('remote-video').srcObject = null;
     setUnmuteVisible(false);
+    monitorViewedCall();
     updatePeerList();
 }
 
@@ -834,7 +836,8 @@ function wakeControls() {
     clearTimeout(controlsTimer);
     controlsTimer = setTimeout(() => {
         const keepVisible = !document.getElementById('unmute-btn').hidden ||
-            document.getElementById('peer-panel').classList.contains('visible');
+            document.getElementById('peer-panel').classList.contains('visible') ||
+            document.getElementById('host-quality').classList.contains('poor');
         if (!keepVisible) container.classList.add('idle');
     }, 3000);
 }
@@ -1000,6 +1003,7 @@ async function shareScreen() {
     }
     currentCall = call;
     showClientState('share-live');
+    stopClientQuality = watchQuality(() => call.peerConnection, showClientQuality);
 
     // Host ended the call or the connection dropped
     const onCallEnded = () => {
@@ -1026,6 +1030,9 @@ async function shareScreen() {
 function endShare(notifyHost) {
     const call = currentCall;
     currentCall = null;
+    if (stopClientQuality) stopClientQuality();
+    stopClientQuality = null;
+    document.getElementById('client-quality-row').hidden = true;
     stopStream(currentStream);
     currentStream = null;
     if (call) {
@@ -1062,6 +1069,114 @@ window.addEventListener('beforeunload', () => {
     });
     if (peer) peer.destroy();
 });
+
+// ========== CONNECTION QUALITY ==========
+// From WebRTC stats: packet loss and round-trip time. Frame rate isn't used,
+// because a still slide is normally sent at about one frame per second.
+const QUALITY_LABELS = { good: 'Good connection', weak: 'Weak connection', poor: 'Poor connection' };
+
+function classifyQuality({ loss, rtt }) {
+    if (loss > 0.08 || rtt > 0.5) return 'poor';
+    if (loss > 0.03 || rtt > 0.25) return 'weak';
+    return 'good';
+}
+
+// Check a connection every 3 seconds and call onChange(level, details).
+// Shows the worse of the last two readings, so one blip doesn't flicker.
+// Returns a function that stops checking.
+function watchQuality(getPeerConnection, onChange) {
+    let lastCounts = null;
+    let previousLevel = 'good';
+    const rank = { good: 0, weak: 1, poor: 2 };
+    const timer = setInterval(async () => {
+        const pc = getPeerConnection();
+        if (!pc || pc.connectionState === 'closed') return;
+        let stats;
+        try { stats = await pc.getStats(); } catch (e) { return; }
+
+        const byId = new Map();
+        stats.forEach(report => byId.set(report.id, report));
+        let loss = null;
+        let rtt = null;
+        let pair = null;
+        stats.forEach((report) => {
+            if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                // Room screen: loss since the last check
+                const counts = { lost: Math.max(0, report.packetsLost || 0), received: report.packetsReceived || 0 };
+                if (lastCounts) {
+                    const lost = Math.max(0, counts.lost - lastCounts.lost);
+                    const total = lost + Math.max(0, counts.received - lastCounts.received);
+                    if (total > 0) loss = lost / total;
+                }
+                lastCounts = counts;
+            } else if (report.type === 'remote-inbound-rtp' && report.kind === 'video' && typeof report.fractionLost === 'number') {
+                // Presenter: loss the room screen reported back
+                loss = report.fractionLost;
+            } else if (report.type === 'transport' && report.selectedCandidatePairId) {
+                pair = byId.get(report.selectedCandidatePairId) || pair;
+            } else if (report.type === 'candidate-pair' && report.nominated && report.state === 'succeeded' && !pair) {
+                pair = report;
+            }
+        });
+        if (pair && typeof pair.currentRoundTripTime === 'number') rtt = pair.currentRoundTripTime;
+        if (loss === null && rtt === null) return;
+
+        const local = pair && byId.get(pair.localCandidateId);
+        const remote = pair && byId.get(pair.remoteCandidateId);
+        const relay = !!((local && local.candidateType === 'relay') || (remote && remote.candidateType === 'relay'));
+        const reading = classifyQuality({ loss: loss || 0, rtt: rtt || 0 });
+        const level = rank[reading] >= rank[previousLevel] ? reading : previousLevel;
+        previousLevel = reading;
+        onChange(level, { loss, rtt, relay });
+    }, 3000);
+    return () => clearInterval(timer);
+}
+
+function qualityDetails({ loss, rtt, relay }) {
+    const parts = [];
+    if (loss !== null) parts.push(`Packet loss ${(loss * 100).toFixed(1)}%`);
+    if (rtt !== null) parts.push(`Delay ${Math.round(rtt * 1000)} ms`);
+    if (relay) parts.push('Using the relay server');
+    return parts.join(' · ');
+}
+
+function setQualityLabel(el, level, details) {
+    el.className = 'quality ' + level;
+    el.innerText = QUALITY_LABELS[level];
+    el.title = qualityDetails(details);
+}
+
+// Room screen: watch the presenter on display
+let stopHostQuality = null;
+let hostQualityCall = null;
+
+function monitorViewedCall() {
+    const peerData = currentViewingPeer && connectedPeers.get(currentViewingPeer);
+    const call = peerData && peerData.call;
+    if (call === hostQualityCall) return;
+    if (stopHostQuality) stopHostQuality();
+    stopHostQuality = null;
+    hostQualityCall = call || null;
+    const el = document.getElementById('host-quality');
+    el.hidden = true;
+    el.className = 'quality';
+    if (!call) return;
+    stopHostQuality = watchQuality(() => call.peerConnection, (level, details) => {
+        setQualityLabel(el, level, details);
+        el.hidden = false;
+        if (level === 'poor') wakeControls();
+    });
+}
+
+// Presenter: show how their connection is doing, with a tip when it's bad
+let stopClientQuality = null;
+
+function showClientQuality(level, details) {
+    setQualityLabel(document.getElementById('client-quality'), level, details);
+    document.getElementById('client-quality-tip').innerText = level === 'good' ? ''
+        : 'The room may see a blurry or frozen picture. Try moving closer to the Wi-Fi or closing video calls.';
+    document.getElementById('client-quality-row').hidden = false;
+}
 
 // ========== BUTTONS ==========
 const ACTIONS = {
