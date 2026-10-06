@@ -1,6 +1,6 @@
 # Hub
 
-The site's home page: a list of the apps, and a "Page not found" page that links back to them.
+The site's home page: a list of the room tools, and a "Page not found" page that links back to them.
 
 It is a small Cloudflare Worker with no dependencies. Other Workers handle their own paths (`/cast` is Cast from this repo, `/clicker`, `/book`); this one answers everything else on the site, and sends `www.`, `app.`, `ai.` and `admin.` to the main address. The site name, intro line and main hostname are settings in the Cloudflare dashboard (`SITE_NAME`, `SITE_INTRO`, `CANONICAL_HOST`), not in this repo.
 

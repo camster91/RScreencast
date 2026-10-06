@@ -1,4 +1,4 @@
-// Home page: a list of the apps, plus a friendly 404.
+// Home page: a list of the room tools, plus a friendly 404.
 // Other Workers own their paths (/cast, /clicker, /book); this one gets the rest.
 // SITE_NAME, SITE_INTRO and CANONICAL_HOST are set in the Cloudflare dashboard.
 import { APPS } from "./apps.js";
@@ -139,7 +139,7 @@ export default {
   async fetch(request, env = {}) {
     const url = new URL(request.url);
     const host = env.CANONICAL_HOST;
-    const siteName = env.SITE_NAME || "Apps";
+    const siteName = env.SITE_NAME || "Room Tools";
     // www, app, ai, admin... all go to the main address
     if (host && url.hostname !== host && url.hostname.endsWith(`.${host}`)) {
       return Response.redirect(`https://${host}${url.pathname}${url.search}`, 301);
@@ -147,7 +147,7 @@ export default {
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
     if (url.pathname === "/health") return new Response("OK");
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return page({ title: siteName, heading: siteName, intro: env.SITE_INTRO || "Tools for rooms and events.", siteName });
+      return page({ title: siteName, heading: siteName, intro: env.SITE_INTRO || "Tools for meeting rooms and events.", siteName });
     }
     return page({ title: `Page not found · ${siteName}`, heading: "Page not found", siteName, intro: "That page doesn’t exist. Try one of these:", status: 404 });
   }

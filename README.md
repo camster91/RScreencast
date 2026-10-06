@@ -2,7 +2,7 @@
 
 Browser-based wireless screen sharing for meeting rooms: the room PC shows a QR code and a 5-character code, and presenters share their laptop screen to the room display over WebRTC. No app install, no cables.
 
-A lightweight alternative to hardware wireless presentation systems.
+Built for meeting rooms as a lightweight alternative to hardware wireless presentation systems.
 
 ## What it does and why
 
