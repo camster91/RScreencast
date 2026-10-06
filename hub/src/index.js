@@ -125,7 +125,7 @@ function page({ title, heading, intro, status = 200 }) {
         </header>
         <nav class="apps" aria-label="Apps">${APPS.filter((app) => !app.hidden).map(appCard).join("")}
         </nav>
-        <footer>Rotman AV</footer>
+        <footer>AV team</footer>
     </main>
 </body>
 </html>`;
@@ -145,8 +145,8 @@ export default {
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
     if (url.pathname === "/health") return new Response("OK");
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return page({ title: "Rotman AV", heading: "Rotman AV", intro: "Tools for Rotman rooms and events." });
+      return page({ title: "AV apps", heading: "AV apps", intro: "Tools for rooms and events." });
     }
-    return page({ title: "Page not found · Rotman AV", heading: "Page not found", intro: "That page doesn’t exist. Try one of these:", status: 404 });
+    return page({ title: "Page not found · AV apps", heading: "Page not found", intro: "That page doesn’t exist. Try one of these:", status: 404 });
   }
 };
