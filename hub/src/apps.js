@@ -5,7 +5,7 @@ export const APPS = [
   {
     name: "Cast",
     path: "/cast/",
-    description: "Share your laptop screen to the room display. Scan the QR code on the screen or enter the room code.",
+    description: "Open Cast here on the room computer. On your laptop, go to /join and enter the room code, or scan the QR code on the room display.",
     icon: '<path d="m9 10 3-3 3 3"/><path d="M12 13V7"/><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/>'
   },
   {
