@@ -291,6 +291,9 @@ async function refreshIceServers() {
 function showJoinAddress(address) {
     document.getElementById('join-address').innerText = address;
     document.querySelectorAll('.join-address-text').forEach(el => { el.innerText = address; });
+    document.querySelectorAll('.presenter-join-link').forEach(el => {
+        el.href = window.location.protocol + '//' + address;
+    });
 }
 
 function showView(id) {
