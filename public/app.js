@@ -79,18 +79,20 @@ let reconnectAttempts = 0;
 let reconnectTimer = null;
 let peerRestarting = false;
 let idTakenAttempts = 0;
+let configRetryTimer = null;
+let configAttempts = 0;
+let configStarting = false;
 
-// Server settings (signaling server, TURN relay). If /config can't be
-// loaded, fall back to PeerJS Cloud with STUN only.
+// Signalling topology is required. Guessing a different server gives the
+// room a code that other devices on this deployment cannot find.
 async function loadConfig() {
-    try {
-        const res = await fetch(BASE_PATH + 'config', { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return await res.json();
-    } catch (e) {
-        console.warn('Could not load /config, using defaults:', e);
-        return {};
+    const res = await fetch(BASE_PATH + 'config', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const config = await res.json();
+    if (!config || !['self', 'cloud'].includes(config.peerServer)) {
+        throw new Error('Invalid signalling configuration');
     }
+    return config;
 }
 
 function buildPeerOptions(config) {
@@ -108,6 +110,29 @@ function buildPeerOptions(config) {
         options.secure = secure;
     }
     return options;
+}
+
+async function startConfiguredPeer() {
+    if (configStarting || peer) return;
+    configStarting = true;
+    clearTimeout(configRetryTimer);
+    configRetryTimer = null;
+    try {
+        const config = await loadConfig();
+        if (typeof config.joinAddress === 'string' && /^[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(config.joinAddress)) {
+            showJoinAddress(config.joinAddress);
+        }
+        peerOptions = buildPeerOptions(config);
+        configAttempts = 0;
+        createPeer(hostRoomCode);
+    } catch (error) {
+        console.warn('Could not load connection settings; retrying:', error);
+        if (isHosting) showHostStatus('Could not load connection settings. Retrying…');
+        const delay = Math.min(30000, 1000 * Math.pow(2, configAttempts++));
+        configRetryTimer = setTimeout(startConfiguredPeer, delay);
+    } finally {
+        configStarting = false;
+    }
 }
 
 function createPeer(id) {
@@ -194,6 +219,7 @@ function recoverPeer() {
 
 // Retry straight away when the network comes back
 window.addEventListener('online', () => {
+    if (!peer && (isHosting || roomId)) { startConfiguredPeer(); return; }
     if (!peer || peer.destroyed || !peer.disconnected) return;
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -249,13 +275,7 @@ if (roomId) {
 }
 
 if (isHosting || roomId) {
-    loadConfig().then((config) => {
-        if (typeof config.joinAddress === 'string' && /^[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(config.joinAddress)) {
-            showJoinAddress(config.joinAddress);
-        }
-        peerOptions = buildPeerOptions(config);
-        createPeer(hostRoomCode);
-    });
+    startConfiguredPeer();
     // TURN credentials expire, and a room PC can stay open for days.
     // New connections pick up the refreshed list.
     setInterval(refreshIceServers, 60 * 60 * 1000);
@@ -281,11 +301,16 @@ if (isHosting) {
 }
 
 async function refreshIceServers() {
-    const config = await loadConfig();
-    if (!peerOptions || !Array.isArray(config.iceServers)) return;
-    const iceServers = buildPeerOptions(config).config.iceServers;
-    peerOptions.config.iceServers = iceServers;
-    if (peer && peer.options.config) peer.options.config.iceServers = iceServers;
+    try {
+        const config = await loadConfig();
+        if (!peerOptions || !Array.isArray(config.iceServers)) return;
+        const iceServers = buildPeerOptions(config).config.iceServers;
+        peerOptions.config.iceServers = iceServers;
+        if (peer && peer.options.config) peer.options.config.iceServers = iceServers;
+    } catch (error) {
+        // Keep the last valid configuration and existing screen shares.
+        console.warn('Could not refresh connection settings:', error);
+    }
 }
 
 function showJoinAddress(address) {
