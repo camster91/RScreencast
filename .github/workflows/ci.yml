@@ -19,7 +19,8 @@ concurrency:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04; keep CI stable when ubuntu-latest moves.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
